@@ -257,10 +257,9 @@ Other sites on the host unchanged (zivantaai.com 307, app.zivantaai.com 200, api
 single-file mount pointed at a stale copy of the Caddyfile (now reloaded via stdin).
 
 **Open items:**
-1. **IAM:** role `pulse-ec2` lacks `s3:DeleteObject` on `kundali-milan/reports/*`, so deleting a person/account
-   leaves the PDF in S3 (`delete_object` jobs fail). After adding it, re-queue failed jobs:
-   `UPDATE jobs SET status='pending', attempts=0, available_at=now(), failure_code=NULL WHERE kind='delete_object' AND status IN ('pending','failed');`
-   Leftovers to remove then: `reports/_permcheck.txt` and the first live test guest (people "Test A/B/C").
+1. ~~IAM `s3:DeleteObject`~~ **resolved 2026-10-29:** permission added by the owner; failed `delete_object` jobs re-queued
+   and completed, probe object and all test data removed (DB: 0 users/people/reports). Live re-test: a deleted
+   account's PDF returns 404.
 2. **Hostname + HTTPS:** none yet. Release APK and web build need HTTPS (WebCrypto/secure storage on web, cleartext blocked in release).
 3. **OpenAI key** pasted in chat on 2026-10-29: not used or stored; owner should revoke it. AI may only write
    explanations around engine scores (not built; needs consent/privacy notice).
