@@ -160,3 +160,6 @@ service's source must stay available to its users.
 When a hostname exists: point its A record at 65.1.226.15, change the site address in the Caddyfile block (Caddy then
 obtains a certificate automatically) and build the app with `API_BASE_URL=https://<host>`. A Pulse redeploy that
 replaces the Caddyfile removes the block; re-run the deploy script.
+Caddy's read-only Caddyfile mount on this host was found pointing at an older copy of the file, so the script
+validates and reloads by piping the host file over stdin (`caddy reload --config /dev/stdin`). A plain
+`caddy reload` inside the container would load the stale copy and drop the KundliMilan route.

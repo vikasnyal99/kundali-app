@@ -10,3 +10,10 @@ def test_production_refuses_unsafe_settings(override):
 
 def test_production_accepts_safe_settings():
     Settings(**GOOD).check()
+
+def test_aws_presigned_urls_use_regional_virtual_host(monkeypatch):
+    from app import services
+    monkeypatch.setattr(services.settings,'s3_endpoint_url',None); monkeypatch.setattr(services.settings,'s3_region','ap-south-1')
+    monkeypatch.setenv('AWS_ACCESS_KEY_ID','test'); monkeypatch.setenv('AWS_SECRET_ACCESS_KEY','test')
+    url=services.s3().generate_presigned_url('get_object',Params={'Bucket':'kundali-milan','Key':'reports/a.pdf'},ExpiresIn=60)
+    assert url.startswith('https://kundali-milan.s3.ap-south-1.amazonaws.com/reports/a.pdf?') and 'X-Amz-Algorithm=AWS4-HMAC-SHA256' in url

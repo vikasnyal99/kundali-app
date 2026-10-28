@@ -48,7 +48,9 @@ def calculate(snapshot):
 
 def s3():
     # SigV4 explicitly: regions launched after 2014 (e.g. ap-south-1) reject legacy SigV2 presigned URLs.
-    return boto3.client('s3',endpoint_url=settings.s3_endpoint_url or None,region_name=settings.s3_region,config=Config(signature_version='s3v4',s3={'addressing_style':'path' if settings.s3_endpoint_url else 'auto'}))
+    # Regional endpoint on AWS: presigned URLs for the global host get a 307 to the region, which breaks the signature.
+    endpoint=settings.s3_endpoint_url or f'https://s3.{settings.s3_region}.amazonaws.com'
+    return boto3.client('s3',endpoint_url=endpoint,region_name=settings.s3_region,config=Config(signature_version='s3v4',s3={'addressing_style':'path' if settings.s3_endpoint_url else 'virtual'}))
 
 KOOTA_NAMES={'en':{'varna':'Varna','vashya':'Vashya','tara':'Tara','yoni':'Yoni','graha_maitri':'Graha Maitri','gana':'Gana','bhakoot':'Bhakoot','nadi':'Nadi'},
  'hi':{'varna':'वर्ण','vashya':'वश्य','tara':'तारा','yoni':'योनि','graha_maitri':'ग्रह मैत्री','gana':'गण','bhakoot':'भकूट','nadi':'नाड़ी'}}

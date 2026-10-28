@@ -48,7 +48,6 @@ $COMPOSE up -d --wait
 if ! grep -q 'reverse_proxy kundli-api:8000' "$CADDYFILE"; then
   backup="$CADDYFILE.bak.$(date +%Y%m%d%H%M%S)"
   cp -p "$CADDYFILE" "$backup"
-  # Append in place (same inode) so Caddy's single-file bind mount sees the change.
   cat >> "$CADDYFILE" <<EOF
 
 # KundliMilan API (added by /opt/kundali-app/infra/server-deploy.sh; backup: $backup)
@@ -57,10 +56,14 @@ $SITE {
 	reverse_proxy kundli-api:8000
 }
 EOF
-  if ! docker exec "$CADDY" caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile; then
-    cat "$backup" > "$CADDYFILE"; echo "Caddyfile invalid; restored $backup" >&2; exit 1
-  fi
-  docker exec "$CADDY" caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
   echo "Caddy: added $SITE"
 fi
+# Feed the host file over stdin: Caddy's read-only single-file mount was found pointing at an older inode
+# (the file had been replaced after Caddy started), so the in-container path is not trusted.
+if ! docker exec -i "$CADDY" caddy validate --config /dev/stdin --adapter caddyfile < "$CADDYFILE"; then
+  if [ -n "${backup:-}" ]; then cat "$backup" > "$CADDYFILE"; echo "Caddyfile invalid; restored $backup" >&2; fi
+  exit 1
+fi
+docker exec -i "$CADDY" caddy reload --config /dev/stdin --adapter caddyfile < "$CADDYFILE"
+docker exec "$CADDY" wget -qO- localhost:2019/config/ | grep -q 'kundli-api:8000' && echo "Caddy: kundli route active"
 $COMPOSE ps
