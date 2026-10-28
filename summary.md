@@ -1,8 +1,8 @@
 # KundliMilan AI — Project Status
 
-**Updated:** 2026-10-28 (second session)  
+**Updated:** 2026-10-29 (third session: EC2 deployment)  
 **Workspace:** `/home/vikas/Desktop/kundali-app`  
-**Nothing has been committed, published or deployed.**
+**Deployed 2026-10-29** to EC2 `pulse-start` at `http://65.1.226.15` (commits `ed4ca15`, `0960d13` pushed to `main`). See §10.
 
 ## 1. Product and sources of truth
 
@@ -196,8 +196,8 @@ Disposable containers used: `kundli-dev-postgres-1`, now stopped (its volume rem
 
 ## 7. Remaining risks
 
-1. **Astrology correctness:** the upstream rules deviate from published tables (§3.1), and there are no reviewed fixtures. Keep `ASTROLOGY_MODE=disabled` for any real users.
-2. **Licensing:** `vedic-calc` is AGPL-3.0-or-later. It is not in the deployed image by default.
+1. **Astrology correctness:** Graha Maitri is now computed from the published naisargika table (§10); the other seven kootas were checked against published tables, but there are still no domain-reviewed fixtures. The owner chose to launch anyway; results keep the experimental labels.
+2. **Licensing:** `vedic-calc` is AGPL-3.0-or-later and **is in the deployed image**. The service's source must stay available to its users (repo is public); an AGPL `LICENSE` and an in-app source link are still missing.
 3. **Guest data loss:** clearing app data or 90 days of inactivity orphans the user's data. There is no recovery.
 4. **Rate limiting:** the in-process limiter is per process. The proxy-level limit and correct `FORWARDED_ALLOW_IPS` are required.
 5. **Memory:** worker memory for large or concurrent Hindi PDFs hasn't been measured on the target server.
@@ -217,8 +217,52 @@ Disposable containers used: `kundli-dev-postgres-1`, now stopped (its volume rem
 ```text
 Continue KundliMilan AI. Read summary.md (current status) and README.md, then the requirements in docs/PRD.md,
 docs/USER_FLOWS.md, docs/SCREEN_SPEC.md, design/DESIGN_SYSTEM.md, architecture/ and docs/DEPLOYMENT.md.
-Verify claims against the code before changing it. Do not enable the experimental engine for real users,
-fabricate scores, use production secrets, commit, publish or deploy unless explicitly asked. Next: act on the
-decisions recorded in summary.md §8, run the S3 tests against MinIO/real storage without TEST_S3_EMULATOR,
-and produce a signed Android release build once the SDK is available. Update summary.md at the end.
+Verify claims against the code before changing it. Never fabricate scores (AI must not produce scores), never
+type secrets into consoles, and commit, push or deploy only when explicitly asked. The live server is described in
+summary.md §10 and docs/DEPLOYMENT.md §8 (deploy via infra/server-deploy.sh over SSM). Next: open items in §10,
+then the decisions in §8. Update summary.md at the end.
 ```
+
+## 10. Deployment (2026-10-29)
+
+**Where:** EC2 `i-0afa5311a28d6d635` (`pulse-start`, m7i-flex.large, Amazon Linux 2023, ap-south-1, Elastic IP
+65.1.226.15), shared with the Pulse monitoring stack and panchang. Access via SSM Session Manager in the console (the
+laptop's AWS CLI keys are invalid; CloudShell is blocked by pending account verification). Checkout: `/opt/kundali-app`.
+
+**What runs:** `kundli-db` (postgres:16-alpine, volume `kundli-milan_kundli-pg`, roles `kundli_owner` for migrations
+and `kundli_app` for runtime), `kundli-api`, one `kundli-worker`; image `kundli-milan:server` built with the engine.
+No host ports. Caddy (`monitoring-service-caddy-1`) routes `http://65.1.226.15` → `kundli-api:8000`. Block appended to
+`/opt/pulse/infrastructure/docker-compose/Caddyfile` (backup `Caddyfile.bak.20261028212732`). Secrets in
+`/opt/kundali-app/.env` and `.env.db` (root, 600). Reports in `s3://kundali-milan/reports/` via instance role `pulse-ec2`.
+`ASTROLOGY_MODE=local_experimental`, `ASTROLOGY_RELEASE_APPROVED=true` by the owner's decision.
+
+**Changes this session:**
+| File | Change |
+|---|---|
+| `server/app/local_engine.py` | Graha Maitri computed from the naisargika relationship table (fixes upstream Mars/Saturn, Venus/Moon, Moon/Mercury); `RULESET` → `…+naisargika-maitri-v1` |
+| `server/app/services.py` | S3 client uses the regional endpoint + virtual host (global-host presigned URLs got a 307 → 403) |
+| `infra/compose.server.yml`, `infra/db-init.sh`, `infra/server-deploy.sh` (new) | Server stack, DB role bootstrap, idempotent deploy (secrets, build, migrate, start, Caddy via stdin) |
+| `infra/Dockerfile` | git/gcc/g++ only during the engine build (pyswisseph has no wheel), purged in the same layer |
+| `.dockerignore` (new), `.gitignore` | Exclude `.env*`, `.git`, `.venv`, `mobile` from the build context; ignore `.env.db` |
+| `server/tests/test_local_engine.py`, `server/tests/test_config.py` | Published 7×7 Graha Maitri table, adapter corrections, regional presigned URL |
+| `docs/DEPLOYMENT.md` | §8 Shared EC2 host |
+
+**Verification:** backend `pytest` 46 passed, 7 skipped; ruff (CI rules) clean. Local run of `compose.server.yml`:
+roles created, migrations, healthy containers, real scores. Live over `http://65.1.226.15`: `/health/ready` →
+`{"status":"ok","calculation_available":true}`; 3-person comparison (26 and 22 of 36, correctly ranked); EN and HI
+PDF reports stored in S3, signed download works (15 KB / 19 KB PDFs), anonymous object URL → 403; account delete → 204.
+Other sites on the host unchanged (zivantaai.com 307, app.zivantaai.com 200, api./panchang. 404 at `/` as before).
+
+**Problems found and fixed:** engine build lacked a compiler; presigned URLs used the global S3 host; Caddy's read-only
+single-file mount pointed at a stale copy of the Caddyfile (now reloaded via stdin).
+
+**Open items:**
+1. **IAM:** role `pulse-ec2` lacks `s3:DeleteObject` on `kundali-milan/reports/*`, so deleting a person/account
+   leaves the PDF in S3 (`delete_object` jobs fail). After adding it, re-queue failed jobs:
+   `UPDATE jobs SET status='pending', attempts=0, available_at=now(), failure_code=NULL WHERE kind='delete_object' AND status IN ('pending','failed');`
+   Leftovers to remove then: `reports/_permcheck.txt` and the first live test guest (people "Test A/B/C").
+2. **Hostname + HTTPS:** none yet. Release APK and web build need HTTPS (WebCrypto/secure storage on web, cleartext blocked in release).
+3. **OpenAI key** pasted in chat on 2026-10-29: not used or stored; owner should revoke it. AI may only write
+   explanations around engine scores (not built; needs consent/privacy notice).
+4. AGPL `LICENSE` + in-app source link; privacy notice; release signing; backups (`pg_dump` of `kundli-db`); monitoring.
+5. A Pulse redeploy that replaces the Caddyfile drops the KundliMilan block; re-run `infra/server-deploy.sh`.

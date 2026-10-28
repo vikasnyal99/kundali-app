@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     job_retention_days: int = 14
     # Server-side encryption header for uploads; empty for S3-compatible stores without SSE support.
     s3_sse: str = 'AES256'
+    # Optional AI provider for explanation text only; scores always come from the deterministic engine.
+    # Set the key in .env on the server, never in code (the repository is public).
+    openai_api_key: str = ''
+    openai_model: str = ''
     def check(self):
         if self.app_env == 'production':
             if self.astrology_mode == 'local_experimental' and not self.astrology_release_approved:
