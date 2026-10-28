@@ -5,11 +5,15 @@ ARG INSTALL_ENGINE=false
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 XDG_CACHE_HOME=/tmp/cache
 # Pango/HarfBuzz for WeasyPrint shaping and font subsetting; Noto includes Devanagari for Hindi PDFs.
 RUN apt-get update && apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fonts-noto-core \
-    $( [ "$INSTALL_ENGINE" = "true" ] && echo git ) && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY server/requirements.txt server/requirements-engine.txt ./
+# The engine needs git (source pin) and a C/C++ compiler (pyswisseph has no wheel); both are removed in the same layer.
 RUN pip install --no-cache-dir -r requirements.txt \
-    && if [ "$INSTALL_ENGINE" = "true" ]; then pip install --no-cache-dir -r requirements-engine.txt; fi \
+    && if [ "$INSTALL_ENGINE" = "true" ]; then \
+         apt-get update && apt-get install -y --no-install-recommends git gcc g++ libc6-dev \
+         && pip install --no-cache-dir -r requirements-engine.txt \
+         && apt-get purge -y --auto-remove git gcc g++ libc6-dev && rm -rf /var/lib/apt/lists/*; fi \
     && useradd --uid 10001 --create-home app
 COPY server/app ./app
 COPY server/migrations ./migrations

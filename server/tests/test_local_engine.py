@@ -100,3 +100,23 @@ def test_domain_reviewed_reference_cases():
     for case in cases:
         facts=local_engine.calculate_local(snapshot(*case['people']))
         assert {r['key']:r['earned'] for r in facts['score']['kootas']}==case['expected_kootas'], case['id']
+
+# Commonly published Ashtakoota Graha Maitri table (rows/columns: Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn).
+PUBLISHED_MAITRI=[[5,5,5,4,5,0,0],[5,5,4,1,4,0.5,0.5],[5,4,5,0.5,5,3,0.5],[4,1,0.5,5,0.5,5,4],[5,4,5,0.5,5,0.5,3],[0,0.5,3,5,0.5,5,5],[0,0.5,0.5,4,3,5,5]]
+LORD_SIGN={'sun':4,'moon':3,'mars':0,'mercury':2,'jupiter':8,'venus':1,'saturn':9}
+
+def test_graha_maitri_matches_published_table():
+    lords=['sun','moon','mars','mercury','jupiter','venus','saturn']
+    for i,a in enumerate(lords):
+        for j,b in enumerate(lords):
+            assert local_engine.graha_maitri(LORD_SIGN[a],LORD_SIGN[b])==PUBLISHED_MAITRI[i][j],(a,b)
+
+@pytest.mark.parametrize('lon1,lon2,expected',[(225.0,285.0,0.5),(45.0,105.0,0.5),(105.0,75.0,1)])
+def test_adapter_corrects_upstream_graha_maitri(monkeypatch,lon1,lon2,expected):
+    # Scorpio/Capricorn (Mars/Saturn), Taurus/Cancer (Venus/Moon), Cancer/Gemini (Moon/Mercury)
+    moons={'a':fake_moon(lon1),'b':fake_moon(lon2)}
+    monkeypatch.setattr(local_engine,'moon',lambda p:moons[p['id']])
+    facts=local_engine.calculate_local(snapshot({'id':'a','birth_utc':'','time_accuracy':'exact'},{'id':'b','birth_utc':'','time_accuracy':'exact'}))
+    rows={r['key']:r['earned'] for r in facts['score']['kootas']}
+    assert rows['graha_maitri']==expected and facts['score']['earned']==sum(rows.values())
+    validate_facts(facts,local_engine.VERSION,local_engine.RULESET)

@@ -1,0 +1,7 @@
+.env
+.env.*
+.git
+.venv
+mobile
+**/__pycache__
+**/.pytest_cache

@@ -133,3 +133,30 @@ limit above is the primary control. The in-process limiter is per process and re
 
 Guest credentials last 90 days and are renewed on each app launch. They live in device secure storage and are lost if
 app data is cleared. Account sign-in/recovery is not implemented (see summary.md).
+
+## 8. Shared EC2 host (current target)
+
+Host `pulse-start` (i-0afa5311a28d6d635, ap-south-1, Elastic IP 65.1.226.15) already runs the Pulse monitoring stack and
+panchang. Its Caddy (`monitoring-service-caddy-1`, config `/opt/pulse/infrastructure/docker-compose/Caddyfile`)
+terminates HTTP/HTTPS for all sites and reaches apps over the `monitoring-service_default` network. Access is via SSM
+Session Manager.
+
+```bash
+sudo git clone https://github.com/vikasnyal99/kundali-app.git /opt/kundali-app
+cd /opt/kundali-app && sudo SITE=http://65.1.226.15 bash infra/server-deploy.sh
+```
+
+`infra/server-deploy.sh` generates `.env` and `.env.db` once (mode 600, never printed), builds the image with the engine,
+starts `kundli-db` (own PostgreSQL 16, volume `kundli-milan_kundli-pg`, roles `kundli_owner` for migrations and
+`kundli_app` for runtime), migrates, starts `kundli-api` + one `kundli-worker`, then appends one site block to the
+Caddyfile (backup kept, validated before reload). Reports go to `s3://kundali-milan/reports/` using the instance role
+`pulse-ec2` (no static keys). Updates: `sudo git pull && sudo SITE=... bash infra/server-deploy.sh` (idempotent).
+
+Release decision recorded 2026-10-29: the owner chose to launch with `ASTROLOGY_MODE=local_experimental` and
+`ASTROLOGY_RELEASE_APPROVED=true` before domain review. Graha Maitri is computed from the published naisargika table;
+results keep the `experimental_engine` / `independent_validation_pending` labels. The engine is AGPL-3.0, so the
+service's source must stay available to its users.
+
+When a hostname exists: point its A record at 65.1.226.15, change the site address in the Caddyfile block (Caddy then
+obtains a certificate automatically) and build the app with `API_BASE_URL=https://<host>`. A Pulse redeploy that
+replaces the Caddyfile removes the block; re-run the deploy script.

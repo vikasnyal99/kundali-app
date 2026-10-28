@@ -1,0 +1,66 @@
+# Shared EC2 host (see docs/DEPLOYMENT.md "Shared EC2 host"). Own PostgreSQL; the API joins the existing
+# Caddy network so Caddy can reach it as kundli-api:8000. No host ports are published, no Redis/Celery.
+# Use through infra/server-deploy.sh, which creates .env/.env.db and runs migrations first.
+name: kundli-milan
+x-app: &app
+  build:
+    context: ..
+    dockerfile: infra/Dockerfile
+    args: {INSTALL_ENGINE: "true"}
+  image: kundli-milan:server
+  env_file: ../.env
+  restart: unless-stopped
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+  read_only: true
+  tmpfs: [/tmp]
+  pids_limit: 128
+  logging: &logging
+    driver: json-file
+    options: {max-size: "10m", max-file: "5"}
+  depends_on:
+    kundli-db: {condition: service_healthy}
+services:
+  kundli-db:
+    image: postgres:16-alpine
+    container_name: kundli-db
+    env_file: ../.env.db
+    restart: unless-stopped
+    volumes:
+      - kundli-pg:/var/lib/postgresql/data
+      - ./db-init.sh:/docker-entrypoint-initdb.d/10-app-role.sh:ro
+    mem_limit: 384m
+    shm_size: 128m
+    logging: *logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    networks: [default]
+  kundli-api:
+    <<: *app
+    container_name: kundli-api
+    mem_limit: 384m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [default, edge]
+  kundli-worker:
+    <<: *app
+    container_name: kundli-worker
+    command: ["python", "-m", "app.worker"]
+    # Exactly one worker (container_name also prevents scaling).
+    mem_limit: 512m
+    cpus: 0.5
+    stop_grace_period: 120s
+    networks: [default]
+networks:
+  edge:
+    external: true
+    name: ${EDGE_NETWORK:-monitoring-service_default}
+volumes:
+  kundli-pg:
