@@ -1,0 +1,20 @@
+{
+  "project": "KundliMilan AI",
+  "artifact_type": "Codex handoff planning package",
+  "contains_source_app": false,
+  "languages": [
+    "en",
+    "hi"
+  ],
+  "storage": [
+    "PostgreSQL",
+    "private S3"
+  ],
+  "ui_design": "specification only; no native Figma source",
+  "features": [
+    "pair Kundli match",
+    "fixed person1 multi-candidate comparison",
+    "PDF reports",
+    "optional AI explanations"
+  ]
+}

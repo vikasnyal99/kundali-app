@@ -1,0 +1,25 @@
+name: kundli_milan
+description: Bilingual traditional Kundli matching and candidate comparison.
+publish_to: none
+version: 0.1.0+1
+environment:
+  sdk: '>=3.10.0 <4.0.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  http: ^1.4.0
+  flutter_secure_storage: ^10.0.0
+  shared_preferences: ^2.5.3
+  url_launcher: ^6.3.1
+  intl: any
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+flutter:
+  uses-material-design: true
+  assets:
+    - lib/l10n/app_en.arb
+    - lib/l10n/app_hi.arb

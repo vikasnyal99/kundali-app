@@ -1,0 +1,3 @@
+# Optional evaluation engine. Read docs/ENGINE_RESEARCH.md before public use.
+vedic-calc @ git+https://github.com/atolat/vedic-calc.git@620d54560ee7e108496495eeb17054a52630a0bf
+pyswisseph==2.10.3.2

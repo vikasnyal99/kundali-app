@@ -1,0 +1,41 @@
+name: Checks
+on: [push, pull_request]
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      # Disposable CI database only; never production credentials.
+      postgres:
+        image: postgres:16-alpine
+        env: {POSTGRES_DB: kundli, POSTGRES_USER: kundli, POSTGRES_PASSWORD: ci-only}
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U kundli" --health-interval 5s --health-retries 10
+    env:
+      TEST_POSTGRES_URL: postgresql+psycopg://kundli:ci-only@127.0.0.1:5432/kundli
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fonts-noto-core libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0
+      # The AGPL engine is installed for adapter tests only; it is not part of the deployed image by default.
+      - run: pip install -r server/requirements-dev.txt -r server/requirements-engine.txt
+      - run: ruff check server --select E9,F63,F7,F82
+      - run: pytest -q
+        working-directory: server
+  mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+        working-directory: mobile
+      - run: flutter analyze
+        working-directory: mobile
+      - run: flutter test
+        working-directory: mobile
+      - run: flutter build web --release
+        working-directory: mobile

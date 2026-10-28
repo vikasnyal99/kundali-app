@@ -1,0 +1,4 @@
+{
+  "_comment": "Only add cases whose expected koota points were independently reviewed by a qualified practitioner, stating the rule variant used. Each person needs birth_utc (ISO 8601 with offset), latitude, longitude, time_accuracy. Person 1 is the groom-side role.",
+  "cases": []
+}

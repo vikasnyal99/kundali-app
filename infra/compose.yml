@@ -1,0 +1,37 @@
+# Existing external PostgreSQL/S3; no Redis, Celery, DB or storage containers.
+# One API process and exactly one worker. Not deployed anywhere yet; see docs/DEPLOYMENT.md.
+name: kundli-milan
+x-hardening: &hardening
+  build:
+    context: ..
+    dockerfile: infra/Dockerfile
+  image: kundli-milan:local
+  env_file: ../.env
+  restart: unless-stopped
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+  read_only: true
+  tmpfs: [/tmp]
+  pids_limit: 128
+  logging:
+    driver: json-file
+    options: {max-size: "10m", max-file: "5"}
+services:
+  api:
+    <<: *hardening
+    # Localhost only: publish through the server's existing HTTPS reverse proxy.
+    ports: ["127.0.0.1:${API_HOST_PORT:-8100}:8000"]
+    mem_limit: 384m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  worker:
+    <<: *hardening
+    command: ["python", "-m", "app.worker"]
+    # Never scale this service: the trial design assumes a single serial worker.
+    mem_limit: 512m
+    cpus: 0.5
+    stop_grace_period: 120s

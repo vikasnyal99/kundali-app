@@ -1,0 +1,314 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:kundli_milan/api.dart';
+import 'package:kundli_milan/main.dart';
+
+Map<String, dynamic> person(String id, String name) => {
+  'id': id,
+  'display_name': name,
+  'birth_date': '1997-09-14',
+  'birth_time_local': '09:30:00',
+  'birth_timezone': 'Asia/Kolkata',
+  'birth_place_name': 'Delhi',
+  'latitude': 28.6,
+  'longitude': 77.2,
+  'time_accuracy': 'exact',
+};
+
+Map<String, dynamic> score(double earned, [List<String> warnings = const []]) =>
+    {
+      'score': {
+        'earned': earned,
+        'possible': 36,
+        'kootas': [
+          {'key': 'nadi', 'earned': 8, 'possible': 8},
+        ],
+      },
+      'warnings': warnings,
+      'calculation': {'engine': 'test'},
+    };
+
+/// In-memory stand-in for the API; records every request for assertions.
+class FakeBackend {
+  final people = [
+    person('a', 'Asha'),
+    person('b', 'Bharat'),
+    person('c', 'Chetan'),
+    person('d', 'Dev'),
+  ];
+  final requests = <http.Request>[];
+  final overrides = <String, http.Response>{};
+  late final client = MockClient((r) async {
+    requests.add(r);
+    final key = '${r.method} ${r.url.path}';
+    if (overrides.containsKey(key)) return overrides[key]!;
+    final body = r.body.isEmpty ? null : jsonDecode(r.body);
+    switch (key) {
+      case 'POST /v1/guest-sessions':
+        return json({'token': 'new-token'}, 201);
+      case 'POST /v1/guest-sessions/refresh':
+        return json({'token': 'renewed'});
+      case 'GET /v1/people':
+        return json(people);
+      case 'GET /v1/places':
+        return json([
+          {
+            'name': 'Varanasi',
+            'region': 'Uttar Pradesh',
+            'country': 'IN',
+            'latitude': 25.3167,
+            'longitude': 83.0104,
+            'timezone': 'Asia/Kolkata',
+          },
+        ]);
+      case 'GET /v1/reports':
+        return json([]);
+      case 'POST /v1/comparisons':
+        return json(comparison(body['person1_id'], body['person2_ids']));
+    }
+    return json({
+      'error': {'code': 'not_found', 'message': 'not_found'},
+    }, 404);
+  });
+  Map<String, dynamic> comparison(String p1, List ids) {
+    // Server contract: results arrive sorted by score with deterministic ties.
+    final scores = {'b': 24.0, 'c': 24.0, 'd': 18.5};
+    final rows =
+        [
+          for (final id in ids)
+            {
+              'id': 'm-$id',
+              'status': 'ready',
+              'people': [
+                people.firstWhere((p) => p['id'] == p1),
+                people.firstWhere((p) => p['id'] == id),
+              ],
+              'facts': score(
+                scores[id]!,
+                id == 'd' ? ['approximate_birth_time'] : [],
+              ),
+            },
+        ]..sort(
+          (x, y) => (y['facts'] as Map)['score']['earned'].compareTo(
+            (x['facts'] as Map)['score']['earned'],
+          ),
+        );
+    return {'id': 'cmp', 'person1_id': p1, 'results': rows};
+  }
+
+  List<Map<String, dynamic>> comparisonBodies() => [
+    for (final r in requests.where((r) => r.url.path == '/v1/comparisons'))
+      jsonDecode(r.body),
+  ];
+  static http.Response json(Object body, [int status = 200]) => http.Response(
+    jsonEncode(body),
+    status,
+    headers: {'content-type': 'application/json; charset=utf-8'},
+  );
+}
+
+Future<FakeBackend> launch(
+  WidgetTester tester, {
+  String locale = 'en',
+  Map<String, String> secure = const {'session': 'old-token'},
+  void Function(FakeBackend)? setup,
+}) async {
+  tester.view.physicalSize = const Size(1000, 2600);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  SharedPreferences.setMockInitialValues({'onboarded': true, 'locale': locale});
+  FlutterSecureStorage.setMockInitialValues(Map.of(secure));
+  final backend = FakeBackend();
+  setup?.call(backend);
+  await tester.pumpWidget(
+    KundliApp(
+      api: Api(client: backend.client, base: 'http://test'),
+    ),
+  );
+  await tester.pumpAndSettle();
+  return backend;
+}
+
+Future<void> choose(WidgetTester tester, String label, String option) async {
+  await tester.tap(find.widgetWithText(DropdownButtonFormField<String>, label));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(option).last);
+  await tester.pumpAndSettle();
+}
+
+void main() {
+  // Cached asset futures are bound to the previous test's fake-async zone.
+  setUp(() => rootBundle.clear());
+  testWidgets(
+    'Person 1 stays fixed while candidates are compared, changed and re-compared',
+    (tester) async {
+      final backend = await launch(tester);
+      await tester.tap(find.text('Compare candidates'));
+      await tester.pumpAndSettle();
+      final compareButton = find.widgetWithText(
+        FilledButton,
+        'Compare selected candidates',
+      );
+      expect(tester.widget<FilledButton>(compareButton).onPressed, isNull);
+
+      await choose(tester, 'Person 1 · stays fixed', 'Asha');
+      // Person 1 is never offered as a candidate.
+      expect(find.widgetWithText(CheckboxListTile, 'Asha'), findsNothing);
+      for (final name in ['Bharat', 'Chetan', 'Dev']) {
+        await tester.tap(find.widgetWithText(CheckboxListTile, name));
+      }
+      await tester.pumpAndSettle();
+      await tester.tap(compareButton);
+      await tester.pumpAndSettle();
+
+      expect(backend.comparisonBodies().single, {
+        'person1_id': 'a',
+        'person2_ids': ['b', 'c', 'd'],
+        'locale': 'en',
+      });
+      expect(find.text('1. Bharat'), findsOneWidget);
+      expect(find.text('2. Chetan'), findsOneWidget);
+      expect(find.text('3. Dev'), findsOneWidget);
+      expect(find.text('24.0 / 36 · Tied score'), findsNWidgets(2));
+      expect(
+        find.text('18.5 / 36 · Has warnings — open details'),
+        findsOneWidget,
+      );
+
+      // Removing a candidate clears stale results but keeps Person 1.
+      await tester.tap(find.widgetWithText(CheckboxListTile, 'Chetan'));
+      await tester.pumpAndSettle();
+      expect(find.text('1. Bharat'), findsNothing);
+      await tester.tap(compareButton);
+      await tester.pumpAndSettle();
+      expect(backend.comparisonBodies().last['person1_id'], 'a');
+      expect(backend.comparisonBodies().last['person2_ids'], ['b', 'd']);
+      expect(find.text('24.0 / 36'), findsOneWidget);
+
+      // Changing Person 1 is explicit and drops that person from the candidate set.
+      await choose(tester, 'Person 1 · stays fixed', 'Bharat');
+      expect(find.widgetWithText(CheckboxListTile, 'Bharat'), findsNothing);
+      expect(tester.widget<FilledButton>(compareButton).onPressed, isNull);
+      await tester.tap(find.widgetWithText(CheckboxListTile, 'Asha'));
+      await tester.pumpAndSettle();
+      await tester.tap(compareButton);
+      await tester.pumpAndSettle();
+      expect(backend.comparisonBodies().last, {
+        'person1_id': 'b',
+        'person2_ids': ['d', 'a'],
+        'locale': 'en',
+      });
+      // Let the poll timer observe the finished results and stop.
+      await tester.pump(const Duration(seconds: 4));
+    },
+  );
+
+  testWidgets('API errors are localised and offer retry', (tester) async {
+    await launch(
+      tester,
+      locale: 'hi',
+      setup: (b) => b.overrides['GET /v1/people'] = FakeBackend.json({
+        'error': {'code': 'rate_limit', 'message': 'x'},
+      }, 429),
+    );
+    expect(
+      find.text('बहुत अधिक अनुरोध। एक मिनट रुककर फिर प्रयास करें।'),
+      findsOneWidget,
+    );
+    expect(find.text('फिर प्रयास करें'), findsWidgets);
+  });
+
+  testWidgets('unknown error codes and proxy error pages stay readable', (
+    tester,
+  ) async {
+    await launch(
+      tester,
+      setup: (b) => b.overrides['GET /v1/reports'] = http.Response(
+        '<html>Bad gateway</html>',
+        502,
+      ),
+    );
+    expect(
+      find.text(
+        'Something went wrong. Check your connection and try again. (error)',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('expired guest session is replaced and the user is told', (
+    tester,
+  ) async {
+    final backend = await launch(
+      tester,
+      setup: (b) =>
+          b.overrides['POST /v1/guest-sessions/refresh'] = FakeBackend.json({
+            'error': {'code': 'session_expired', 'message': 'x'},
+          }, 401),
+    );
+    expect(
+      find.textContaining('previous guest session expired'),
+      findsOneWidget,
+    );
+    expect(
+      backend.requests.map((r) => r.url.path),
+      contains('/v1/guest-sessions'),
+    );
+    expect(backend.requests.last.headers['Authorization'], 'Bearer new-token');
+  });
+
+  testWidgets('active session is renewed on launch', (tester) async {
+    final backend = await launch(tester);
+    expect(backend.requests.first.url.path, '/v1/guest-sessions/refresh');
+    expect(backend.requests.first.headers['Authorization'], 'Bearer old-token');
+    expect(await const FlutterSecureStorage().read(key: 'session'), 'renewed');
+  });
+
+  testWidgets(
+    'switching language in settings relabels the app without leaving the screen',
+    (tester) async {
+      await launch(tester);
+      await tester.tap(find.text('Settings'));
+      await tester.pumpAndSettle();
+      expect(find.text('Methodology & privacy'), findsOneWidget);
+      await tester.tap(find.text('हिन्दी'));
+      await tester.pumpAndSettle();
+      expect(find.text('Methodology & privacy'), findsNothing);
+      expect(find.text('सेटिंग्स'), findsWidgets);
+      expect(find.byType(SegmentedButton<String>), findsOneWidget);
+      expect((await SharedPreferences.getInstance()).getString('locale'), 'hi');
+    },
+  );
+
+  testWidgets('place search fills coordinates and timezone for confirmation', (
+    tester,
+  ) async {
+    final backend = await launch(tester);
+    await tester.tap(find.text('Saved people').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add person'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Search birthplace (city)'),
+      'Vara',
+    );
+    await tester.pumpAndSettle();
+    expect(backend.requests.last.url.queryParameters['q'], 'Vara');
+    await tester.tap(find.text('Varanasi, Uttar Pradesh, IN'));
+    await tester.pumpAndSettle();
+    String field(String label) => tester
+        .widget<TextField>(find.widgetWithText(TextField, label))
+        .controller!
+        .text;
+    expect(field('Birth place'), 'Varanasi, Uttar Pradesh, IN');
+    expect(field('Latitude'), '25.3167');
+    expect(field('Longitude'), '83.0104');
+    expect(field('IANA timezone (e.g. Asia/Kolkata)'), 'Asia/Kolkata');
+  });
+}

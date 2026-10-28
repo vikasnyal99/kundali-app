@@ -1,0 +1,32 @@
+# Local development and integration tests ONLY. Disposable PostgreSQL + private S3-compatible storage.
+# No Redis/Celery: the worker uses the PostgreSQL jobs table. Ports bind to localhost only.
+# Production uses the existing external PostgreSQL/S3 via infra/compose.yml.
+name: kundli-dev
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: kundli
+      POSTGRES_USER: kundli
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-only}
+    ports: ["127.0.0.1:55432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kundli"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  minio:
+    # Community images are no longer published on Docker Hub; this pinned tag is on quay.io.
+    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-devminio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-devminio-password-change}
+      # Local-only static key so SSE-S3 (ServerSideEncryption=AES256) uploads work like AWS S3.
+      MINIO_KMS_SECRET_KEY: local-dev-key:Wm9vdGg0SWFpcjRhaWdoNWFlTmFpcGgzZWVuZ2VlNng=
+    ports: ["127.0.0.1:59000:9000"]
+    volumes: [miniodata:/data]
+volumes:
+  pgdata:
+  miniodata:
