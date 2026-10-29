@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # End-to-end API check with curl + jq. Creates a throwaway guest, exercises every endpoint, then deletes it.
-#   bash server/scripts/api_smoke.sh                      # default http://65.1.226.15
+#   bash server/scripts/api_smoke.sh                      # default https://kundaliapi.zivantaai.com
 #   API=https://your-host bash server/scripts/api_smoke.sh
 set -euo pipefail
-API=${API:-http://65.1.226.15}
+API=${API:-https://kundaliapi.zivantaai.com}
 J='Content-Type: application/json'
 step(){ printf '\n== %s\n' "$*"; }
 wait_for(){  # wait_for <path> <jq filter that is true when done>

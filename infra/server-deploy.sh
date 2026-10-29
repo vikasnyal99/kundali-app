@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Install or update KundliMilan on the shared EC2 host. Run as root from the checkout:
-#   sudo SITE=http://65.1.226.15 bash infra/server-deploy.sh
-# SITE is the Caddy site address (later e.g. kundli.example.com for automatic HTTPS). Secrets are generated
+#   sudo SITE=kundaliapi.zivantaai.com bash infra/server-deploy.sh
+# SITE is a Caddy site address: a hostname gets automatic HTTPS (Let's Encrypt), http://IP stays plain HTTP.
+# Each SITE gets its own block once; earlier sites (e.g. http://65.1.226.15 for old app builds) are kept. Secrets are generated
 # once into .env (API/worker) and .env.db (database), both mode 600, and are never printed.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -9,7 +10,7 @@ COMPOSE="docker compose -f infra/compose.server.yml"
 EDGE_NETWORK=${EDGE_NETWORK:-monitoring-service_default}
 CADDY=${CADDY_CONTAINER:-monitoring-service-caddy-1}
 CADDYFILE=${CADDYFILE:-/opt/pulse/infrastructure/docker-compose/Caddyfile}
-SITE=${SITE:?set SITE, e.g. SITE=http://65.1.226.15}
+SITE=${SITE:?set SITE, e.g. SITE=kundaliapi.zivantaai.com}
 
 umask 077
 if [ ! -f .env.db ]; then
@@ -53,7 +54,7 @@ $COMPOSE up -d --wait kundli-db
 $COMPOSE run --rm --no-deps -e DATABASE_URL="postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@kundli-db:5432/${POSTGRES_DB}" kundli-api alembic upgrade head
 $COMPOSE up -d --wait
 
-if ! grep -q 'reverse_proxy kundli-api:8000' "$CADDYFILE"; then
+if ! grep -qxF "$SITE {" "$CADDYFILE"; then
   backup="$CADDYFILE.bak.$(date +%Y%m%d%H%M%S)"
   cp -p "$CADDYFILE" "$backup"
   cat >> "$CADDYFILE" <<EOF

@@ -73,7 +73,7 @@ Settings come from the repo-root `.env` (or `server/.env`); real environment var
 ```bash
 cd mobile
 flutter pub get
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8100     # Android emulator → host
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8100     # Android emulator → local API (default: https://kundaliapi.zivantaai.com)
 # physical device: use the host's LAN IP; release builds must use an https:// API_BASE_URL
 ```
 

@@ -13,7 +13,7 @@ class ApiException implements Exception {
 class Api {
   static const defaultBase = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:8100',
+    defaultValue: 'https://kundaliapi.zivantaai.com',
   );
   Api({http.Client? client, this.base = defaultBase})
     : client = client ?? http.Client();

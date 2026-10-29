@@ -143,7 +143,7 @@ Session Manager.
 
 ```bash
 sudo git clone https://github.com/vikasnyal99/kundali-app.git /opt/kundali-app
-cd /opt/kundali-app && sudo SITE=http://65.1.226.15 bash infra/server-deploy.sh
+cd /opt/kundali-app && sudo SITE=kundaliapi.zivantaai.com bash infra/server-deploy.sh
 ```
 
 `infra/server-deploy.sh` generates `.env` and `.env.db` once (mode 600, never printed), builds the image with the engine,
@@ -157,9 +157,12 @@ Release decision recorded 2026-10-29: the owner chose to launch with `ASTROLOGY_
 results keep the `experimental_engine` / `independent_validation_pending` labels. The engine is AGPL-3.0, so the
 service's source must stay available to its users.
 
-When a hostname exists: point its A record at 65.1.226.15, change the site address in the Caddyfile block (Caddy then
-obtains a certificate automatically) and build the app with `API_BASE_URL=https://<host>`. A Pulse redeploy that
-replaces the Caddyfile removes the block; re-run the deploy script.
+Hostname (2026-10-30): `kundaliapi.zivantaai.com` has an A record at Hostinger (TTL 60) → 65.1.226.15. Each `SITE`
+gets its own Caddyfile block once; a hostname gets a Let's Encrypt certificate automatically (ports 80/443 must stay
+open), and the older `http://65.1.226.15` block is kept so earlier debug builds keep working. The app's default
+`API_BASE_URL` is `https://kundaliapi.zivantaai.com`. A Pulse redeploy that replaces the Caddyfile removes the blocks;
+re-run the deploy script once per site (`SITE=kundaliapi.zivantaai.com`, and `SITE=http://65.1.226.15` while old
+builds are in use).
 Caddy's read-only Caddyfile mount on this host was found pointing at an older copy of the file, so the script
 validates and reloads by piping the host file over stdin (`caddy reload --config /dev/stdin`). A plain
 `caddy reload` inside the container would load the stale copy and drop the KundliMilan route.
