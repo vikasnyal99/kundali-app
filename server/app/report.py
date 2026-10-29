@@ -189,15 +189,14 @@ def report_html(match,locale,summary=None):
     note_html=''.join(f"<div class='note'><span class='nh'>{e(k['name'])}</span> <span class='pts {pts_class(k['earned'],k['possible'])}'>{e(num(k['earned']))} / {e(num(k['possible']))}</span><br>{e(notes.get(k['key'],''))}</div>" for k in ctx['kootas'])
     li=lambda items:'<ul>'+''.join(f'<li>{e(x)}</li>' for x in items)+'</ul>' if items else ''
     calc=facts['calculation']
-    method=''.join(f"<tr><td class='k'>{e(L[k])}</td><td>{e(calc[k])}</td></tr>" for k in ('engine','version','ruleset','ayanamsa','calculated_at','validation') if k in calc)
-    warnings=''.join(f"<li>{e(WARNINGS[locale].get(w,w))}</li>" for w in facts.get('warnings',[]))
+    # Method and calculation notes as compact lines, so the reading page does not spill onto a nearly empty page.
+    method=' · '.join(f"<b>{e(L[k])}:</b> {e(calc[k])}" for k in ('engine','version','ruleset','ayanamsa','calculated_at','validation') if k in calc)
+    warnings=' '.join(e(WARNINGS[locale].get(w,w)) for w in facts.get('warnings',[]))
     reading=f'''<section class="page"><h2>{e(L['reading'])}</h2>
 <h3>{e(L['koota_notes'])}</h3>{note_html}
 {f"<h3>{e(L['strengths'])}</h3>{li(text['strengths'])}" if text['strengths'] else ''}
 {f"<h3>{e(L['considerations'])}</h3>{li(text['considerations'])}" if text['considerations'] else ''}
 <div class="box"><div class="hl">{e(L['guidance'])}</div>{e(text['guidance'])}</div>
-<h2>{e(L['method'])}</h2><table class="small">{method}</table>
-{f"<h3>{e(L['warnings'])}</h3><ul class='small'>{warnings}</ul>" if warnings else ''}
-<div class="disc">{e(L['ai']) + '<br>' if text.get('source')=='ai' else ''}{e(L['disclaimer'])}</div></section>'''
+<div class="disc"><b>{e(L['method'])}.</b> {method}{f"<br><b>{e(L['warnings'])}:</b> {warnings}" if warnings else ''}<br>{e(L['ai']) + ' ' if text.get('source')=='ai' else ''}{e(L['disclaimer'])}</div></section>'''
     return (f'<html lang="{locale}"><head><meta charset="utf-8"><title>{e(L["title"])}</title><style>{css}</style></head>'
             f'<body><div class="frame"></div>{cover}{tables}{charts}{reading}</body></html>')
