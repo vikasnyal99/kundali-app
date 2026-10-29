@@ -3,7 +3,7 @@
 **Updated:** 2026-10-29 (fourth session: instant matches, OpenAI summaries, new PDF; see §11)  
 **Workspace:** `/home/vikas/Desktop/kundali-app`  
 **Live** at `https://kundaliapi.zivantaai.com` (since 2026-10-30; `http://65.1.226.15` kept for old debug builds) on EC2
-`pulse-start`, server at commit `b8a80ce` on `main`. See §10–§12.
+`pulse-start`, server at commit `ebddda3` on `main`. See §10–§13.
 
 ## 1. Product and sources of truth
 
@@ -379,3 +379,11 @@ search). `flutter analyze` clean, `flutter test` 10 passed (new: form body for e
 time sends no time, invalid 31 February and unchosen place are rejected). Release APK rebuilt (55.0 MB).
 Check on the server which saved people are Unknown:
 `sudo docker exec kundli-db psql -U kundli_owner -d kundli -c "select data->>'time_accuracy', count(*) from people group by 1"`.
+
+**Deployed and verified live (2026-10-30, `ebddda3`, throwaway guest deleted afterwards):** `/v1/places?q=248001`
+lists Dehradun post offices; "chamba kalan" finds the village (Tarn Taran, Punjab, 143408); a person saved with
+`time_accuracy: unknown` and no time is stored at 12:00:00 (06:30 UTC); a match with them is `ready` (16/36) with
+`birth_time_unknown_noon` and `unknown_time_moon_changes_that_day`; the English PDF is 4 pages, says "Birth time
+unknown" instead of that Lagna chart and labels planets as noon positions. The owner installs the release APK from
+`mobile/build/app/outputs/flutter-apk/app-release.apk`. People saved earlier as Unknown now calculate without
+re-entry; adding their time makes the result reliable and draws the Lagna chart.
