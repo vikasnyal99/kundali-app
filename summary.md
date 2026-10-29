@@ -2,7 +2,8 @@
 
 **Updated:** 2026-10-29 (fourth session: instant matches, OpenAI summaries, new PDF; see §11)  
 **Workspace:** `/home/vikas/Desktop/kundali-app`  
-**Deployed 2026-10-29** to EC2 `pulse-start` at `http://65.1.226.15`; live at commit `aa2418b` on `main`. See §10 and §11.
+**Live** at `https://kundaliapi.zivantaai.com` (since 2026-10-30; `http://65.1.226.15` kept for old debug builds) on EC2
+`pulse-start`, server at commit `b8a80ce` on `main`. See §10–§12.
 
 ## 1. Product and sources of truth
 
@@ -261,7 +262,7 @@ single-file mount pointed at a stale copy of the Caddyfile (now reloaded via std
 1. ~~IAM `s3:DeleteObject`~~ **resolved 2026-10-29:** permission added by the owner; failed `delete_object` jobs re-queued
    and completed, probe object and all test data removed (DB: 0 users/people/reports). Live re-test: a deleted
    account's PDF returns 404.
-2. **Hostname + HTTPS:** none yet. Release APK and web build need HTTPS (WebCrypto/secure storage on web, cleartext blocked in release).
+2. ~~**Hostname + HTTPS**~~ **resolved 2026-10-30:** `https://kundaliapi.zivantaai.com` (§12).
 3. ~~**OpenAI key**~~ **resolved 2026-10-29:** summaries are live (§11). The key is in the server's `.env` (entered at the
    deploy prompt) and in the laptop's gitignored `.env`; it is not in git. The key pasted in chat earlier should still be
    revoked if it is a different one. A privacy notice about sending chart attributes to OpenAI is still missing.
@@ -327,10 +328,29 @@ the AWS console from this machine was blocked by the permission system.
    gitignored `.env` (mode 600) before committing; staged diffs were checked for `sk-` keys before each push.
 3. **Old reports** keep their old layout: an existing report for a match and language is reused.
 4. **Flutter SDK** is now at `~/.local/opt/flutter` (3.47.8 stable); the previous `/tmp/kundli-flutter` had disappeared.
-   APK: `flutter build apk --debug --dart-define=API_BASE_URL=http://65.1.226.15` with `JAVA_HOME=~/.local/opt/jdk17`,
-   `GRADLE_OPTS=-Dorg.gradle.vfs.watch=false`. The owner runs the debug APK; a release APK (much faster) needs HTTPS.
+   APK: `flutter build apk --release` (defaults to the HTTPS API, see §12) with `JAVA_HOME=~/.local/opt/jdk17`,
+   `GRADLE_OPTS=-Dorg.gradle.vfs.watch=false`.
 5. **Privacy:** add a notice that chart attributes (not names or birth data) are sent to OpenAI.
 6. **Upstream rule note (for the domain reviewer):** vedic-calc gives Yoni 3/4 when both people have the same animal and
    the same gender; most published tables give 4/4. Not changed.
 7. iOS was discussed and deferred: the Flutter project is iOS-ready, but builds need macOS (e.g. Codemagic) and an
    Apple Developer account.
+
+## 12. Domain and HTTPS (2026-10-30)
+
+- **DNS:** the owner added an A record at Hostinger: `kundaliapi` → `65.1.226.15`, TTL 60, on `zivantaai.com`
+  (nameservers `ns1/ns2.dns-parking.com`). Resolves on 8.8.8.8 and 1.1.1.1.
+- **Problem found:** HTTPS failed with a TLS alert because Caddy had no site for the name, so it had no certificate.
+  `infra/server-deploy.sh` only added a site when no KundliMilan route existed, so the IP block blocked any new one.
+- **Fix (`b8a80ce`):** the script adds one Caddy block per `SITE` (exact `SITE {` line match). A hostname gets a
+  Let's Encrypt certificate automatically. The `http://65.1.226.15` block is kept for existing debug builds.
+  Deploy: `cd /opt/kundali-app && sudo git pull && sudo SITE=kundaliapi.zivantaai.com bash infra/server-deploy.sh`.
+- **App:** `mobile/lib/api.dart` defaults `API_BASE_URL` to `https://kundaliapi.zivantaai.com`;
+  `server/scripts/api_smoke.sh` defaults to the same. `flutter analyze` clean, `flutter test` 9 passed.
+  Release APK built: `mobile/build/app/outputs/flutter-apk/app-release.apk` (54.6 MB, signed with the debug key like
+  the earlier debug APK, so it installs over it and keeps data).
+- **Verified live:** `/health/ready` over HTTPS in 0.15 s; certificate issuer Let's Encrypt, valid until 2027-01-27
+  (Caddy renews). Full `api_smoke.sh` over HTTPS passed: match, ranked comparison, PDF with signed download, unsigned
+  object → 403, export, account delete → 204, signed URL after delete → 404. `http://65.1.226.15` still answers.
+- **Open:** a real release signing key before any Play Store upload; retire the IP block once no debug builds remain;
+  a Pulse redeploy that replaces the Caddyfile drops both blocks (re-run the deploy script per site).
