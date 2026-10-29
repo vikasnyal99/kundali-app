@@ -1,5 +1,6 @@
 import hashlib
 import json
+from pathlib import Path
 from datetime import timedelta
 from collections import defaultdict, deque
 from time import monotonic
@@ -9,6 +10,7 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select, delete, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DBSession
@@ -26,6 +28,11 @@ limits = defaultdict(deque)
 async def guard(request: Request, call_next):
     if int(request.headers.get('content-length','0') or 0) > 65536:
         return JSONResponse({'error':{'code':'request_too_large','message':'Request exceeds limit'}},status_code=413)
+    if not request.url.path.startswith(('/v1/','/health/')):
+        # Web app files: revalidate on every load (ETag → 304), so a deploy reaches phones on their next open.
+        response = await call_next(request)
+        response.headers['Cache-Control'] = 'no-cache'
+        return response
     key = (request.client.host if request.client else 'unknown', request.url.path == '/v1/guest-sessions')
     if len(limits) > 5000: limits.clear()  # bound memory under many distinct client addresses
     q = limits[key]; current = monotonic()
@@ -202,3 +209,8 @@ def export(u=Depends(user),db:DBSession=Depends(session)):
 def erase(u=Depends(user),db:DBSession=Depends(session)):
     for p in list(db.scalars(select(Person).where(Person.owner_id==u.id))): invalidate(db,u.id,p.id); db.delete(p)
     db.delete(u); db.commit()
+def mount_web(directory):
+    """Serve the web app (Flutter web build, see infra/Dockerfile) at '/'; mounted last, so API routes win."""
+    if directory and Path(directory,'index.html').is_file():
+        app.mount('/',StaticFiles(directory=directory,html=True),name='web')
+mount_web(settings.web_dir)

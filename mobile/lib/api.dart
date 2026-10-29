@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
@@ -11,12 +12,17 @@ class ApiException implements Exception {
 }
 
 class Api {
-  static const defaultBase = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'https://kundaliapi.zivantaai.com',
-  );
-  Api({http.Client? client, this.base = defaultBase})
-    : client = client ?? http.Client();
+  static const configuredBase = String.fromEnvironment('API_BASE_URL');
+
+  /// The web app calls the API on the site that served it (localhost or the live host).
+  static String get defaultBase => configuredBase.isNotEmpty
+      ? configuredBase
+      : kIsWeb
+      ? Uri.base.origin
+      : 'https://kundaliapi.zivantaai.com';
+  Api({http.Client? client, String? base})
+    : client = client ?? http.Client(),
+      base = base ?? defaultBase;
   final http.Client client;
   final String base;
   final storage = const FlutterSecureStorage();

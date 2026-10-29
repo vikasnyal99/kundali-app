@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'api.dart';
+import 'web_bridge.dart';
 
 void main() => runApp(const KundliApp());
 
@@ -21,16 +23,43 @@ class _KundliAppState extends State<KundliApp> {
   Map<String, dynamic> strings = {};
   bool onboarded = false;
   late final api = widget.api ?? Api();
+  final navigator = GlobalKey<NavigatorState>();
   @override
   void initState() {
     super.initState();
+    exposeBack(() {
+      final nav = navigator.currentState;
+      if (nav == null || !nav.canPop()) return false;
+      nav.maybePop();
+      return true;
+    });
     load();
   }
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
+    await adoptHandoff(prefs);
     onboarded = prefs.getBool('onboarded') ?? false;
     await language(prefs.getString('locale') ?? 'en');
+  }
+
+  /// The native shell hands its earlier guest session over once (see lib/shell.dart), so people
+  /// saved in the old native app stay reachable from the web app.
+  Future<void> adoptHandoff(SharedPreferences prefs) async {
+    final raw = prefs.getString('kundli_handoff');
+    if (raw == null) return;
+    await prefs.remove('kundli_handoff');
+    try {
+      final h = jsonDecode(raw) as Map<String, dynamic>;
+      if (h['session'] is String &&
+          await api.storage.read(key: 'session') == null) {
+        await api.storage.write(key: 'session', value: h['session']);
+      }
+      if (h['locale'] is String) await prefs.setString('locale', h['locale']);
+      if (h['onboarded'] == true) await prefs.setBool('onboarded', true);
+    } catch (_) {
+      // A malformed hand-over only means starting with a fresh guest session.
+    }
   }
 
   Future<void> language(String value) async {
@@ -54,6 +83,7 @@ class _KundliAppState extends State<KundliApp> {
         ? const Color(0xff9e4f24)
         : const Color(0xff355c50);
     return MaterialApp(
+      navigatorKey: navigator,
       debugShowCheckedModeBanner: false,
       title: 'KundliMilan',
       locale: Locale(locale),
@@ -151,6 +181,14 @@ class _KundliAppState extends State<KundliApp> {
 }
 
 typedef Translate = String Function(String);
+
+/// Opens a signed PDF link. On the web it replaces the page: browsers block new tabs opened after
+/// waiting for the report, and the native shell hands non-app links to the phone's PDF viewer.
+Future<bool> openPdf(String url) => launchUrl(
+  Uri.parse(url),
+  mode: LaunchMode.externalApplication,
+  webOnlyWindowName: kIsWeb ? '_self' : null,
+);
 
 /// Localised message for an API error code; unknown codes stay visible for support.
 String describeError(Object e, Translate t) {
@@ -487,10 +525,7 @@ class _ShellState extends State<Shell> {
                     'POST',
                     '/v1/reports/${r['id']}/download-url',
                   );
-                  if (!await launchUrl(
-                    Uri.parse(d['url']),
-                    mode: LaunchMode.externalApplication,
-                  )) {
+                  if (!await openPdf(d['url'])) {
                     throw Exception();
                   }
                 } else if (r['status'] == 'failed') {
@@ -1516,10 +1551,7 @@ class _MatchDetailState extends State<MatchDetail> {
         'POST',
         '/v1/reports/${report!['id']}/download-url',
       );
-      if (!await launchUrl(
-        Uri.parse(d['url']),
-        mode: LaunchMode.externalApplication,
-      )) {
+      if (!await openPdf(d['url'])) {
         throw Exception();
       }
     } catch (e) {

@@ -3,7 +3,8 @@
 **Updated:** 2026-10-29 (fourth session: instant matches, OpenAI summaries, new PDF; see §11)  
 **Workspace:** `/home/vikas/Desktop/kundali-app`  
 **Live** at `https://kundaliapi.zivantaai.com` (since 2026-10-30; `http://65.1.226.15` kept for old debug builds) on EC2
-`pulse-start`, server at commit `ebddda3` on `main`. See §10–§13.
+`pulse-start`. Since §14 the app's screens are a web app served at that address; the APK is a native splash + WebView.
+See §10–§14.
 
 ## 1. Product and sources of truth
 
@@ -387,3 +388,49 @@ lists Dehradun post offices; "chamba kalan" finds the village (Tarn Taran, Punja
 unknown" instead of that Lagna chart and labels planets as noon positions. The owner installs the release APK from
 `mobile/build/app/outputs/flutter-apk/app-release.apk`. People saved earlier as Unknown now calculate without
 re-entry; adding their time makes the result reliable and draws the Lagna chart.
+
+## 14. Web screens with a native shell (2026-10-30)
+
+**Owner's goal:** only the first screen native (a short Kundali animation); every other screen on the web, so app changes
+ship with a server deploy instead of a new APK. Decisions: serve at `https://kundaliapi.zivantaai.com/`, allow normal
+browser use, sideload only.
+
+**Design:**
+- **Web app** = the existing screens (`mobile/lib/main.dart`) built with `flutter build web` and served by the API at `/`
+  (`main.py` `mount_web`, `WEB_DIR`); API routes win, so `/v1` and `/health` are unchanged. Web files get
+  `Cache-Control: no-cache` (ETag → 304), so a deploy reaches phones on their next open; they skip the API rate limit.
+  Flutter's generated service worker only unregisters itself, so nothing is cached in a worker. The app calls the API on
+  the origin that served it (`api.dart`), so the same build works on localhost and live. PDFs open in the same tab on the
+  web (pop-up blockers stop new tabs opened after waiting for a report).
+- **Native shell** (`mobile/lib/shell.dart`, `flutter build apk -t lib/shell.dart`): the North Indian kundali frame draws
+  itself (1.8 s), the name fades in, and the WebView loads underneath. It is revealed once Flutter web has drawn
+  (`flutter-view` present). Links outside the app host (signed S3 PDFs) open in the phone's viewer. Android back calls
+  `window.kundliBack()` (exposed by `web_bridge_web.dart`; Navigator pushes add no browser history) and leaves the app on
+  the home screen. Offline: a bilingual "No internet" screen with Retry. Same `applicationId` and signing key, so it
+  installs over the old app.
+- **Session hand-over (once):** the shell reads the old native guest session, language and onboarding flag, opens
+  `handoff.html` on the app origin, writes them to `localStorage['flutter.kundli_handoff']` (the web
+  SharedPreferences format), and `location.replace('./')`; `main.dart` `adoptHandoff` stores the session (if none yet)
+  and deletes the key. The token never appears in a URL.
+- **Server build:** `infra/Dockerfile` has a `web` stage that installs Flutter 3.47.8 from the release archive
+  (SHA-256 checked) and builds the web app; `.dockerignore` now includes `mobile/lib`, `mobile/web` and pubspec files.
+  The first server build downloads Flutter (about 1 GB, cached afterwards).
+
+**Verification:** backend `pytest` 62 passed, 7 skipped (new `test_web.py`: served at `/`, `no-cache`, ETag 304, API not
+shadowed, static files outside the rate limit, no web dir → API only). `flutter analyze` clean; `flutter test` 14 passed
+(new `shell_test.dart`: app vs. outside links, triple-encoded hand-over script round-trips through the web
+SharedPreferences format, splash, offline retry). Local browser run against `http://localhost:8100` with the web build:
+onboarding, pincode and town search, Unknown time hiding the time boxes, saving, the people list. The hand-over script
+on `handoff.html` made the web app refresh the handed-over session (no new guest), apply Hindi, show that session's
+saved person and remove the key; `kundliBack()` returns false on the home screen. The Docker image built locally
+(web compiled in 33 s; 395 MB) and served `/`, `main.dart.js`, `handoff.html` and the API on a read-only, no-capability
+container (about 71 MB RAM).
+**Not verified:** the shell's WebView on a device (the local emulator has no Android system image installed); first
+real run is on the owner's phone.
+
+**APKs:** `mobile/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk` (16.5 MB, modern phones) or
+`app-release.apk` (46 MB, all CPU types).
+
+**Notes:** browser back inside the web app leaves the site rather than closing a screen (no URL routes yet); first open
+downloads about 1 MB of app code (gzipped) plus CanvasKit from Google's CDN; Play Store would need more native value
+than a WebView wrapper.

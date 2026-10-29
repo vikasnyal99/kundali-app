@@ -1,11 +1,11 @@
 {
-    "name": "kundli_milan",
-    "short_name": "kundli_milan",
+    "name": "KundliMilan",
+    "short_name": "KundliMilan",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#fffaf0",
+    "theme_color": "#7a2e1d",
+    "description": "Bilingual Kundli matching (Ashta Koota Guna Milan).",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

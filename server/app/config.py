@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     astrology_api_key: str = ''
     astrology_engine_version: str = 'unconfigured'
     cors_origins: str = 'http://localhost:8080'
+    # Directory of the Flutter web build served at '/'; empty serves the API only.
+    web_dir: str = ''
     # The worker only renders PDFs and runs provider calculations; local matches are computed inline.
     worker_poll_seconds: float = 1
     job_max_attempts: int = 3

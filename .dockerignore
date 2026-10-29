@@ -2,6 +2,14 @@
 .env.*
 .git
 .venv
-mobile
+# Only mobile/lib, mobile/web and pubspec files are used (web app stage); skip native and build output.
+mobile/build
+mobile/.dart_tool
+mobile/android
+mobile/ios
+mobile/linux
+mobile/macos
+mobile/windows
+mobile/test
 **/__pycache__
 **/.pytest_cache

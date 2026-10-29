@@ -68,16 +68,23 @@ curl -s localhost:8100/health/ready
 Settings come from the repo-root `.env` (or `server/.env`); real environment variables override them. To try calculations locally, set
 `ASTROLOGY_MODE=local_experimental` (requires the engine install above). Every result is then labelled experimental.
 
-### 4. Mobile app
+### 4. App: web screens + native shell
+
+All screens are a Flutter **web** app (`mobile/lib/main.dart`) served by the API at `/`; the Android APK is only a
+native splash and a WebView (`mobile/lib/shell.dart`). Screen changes therefore ship with a server deploy, no new APK.
 
 ```bash
-cd mobile
-flutter pub get
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8100     # Android emulator → local API (default: https://kundaliapi.zivantaai.com)
-# physical device: use the host's LAN IP; release builds must use an https:// API_BASE_URL
+cd mobile && flutter pub get
+flutter build web --release -t lib/main.dart                 # → mobile/build/web
+cd ../server && WEB_DIR=../mobile/build/web ASTROLOGY_MODE=local_experimental \
+  ../.venv/bin/uvicorn app.main:app --port 8100              # open http://localhost:8100 (API under /v1)
+# Shell APK (rarely rebuilt). Default APP_URL is https://kundaliapi.zivantaai.com/
+cd ../mobile && flutter build apk --release --split-per-abi -t lib/shell.dart
+flutter run -t lib/shell.dart --dart-define=APP_URL=http://10.0.2.2:8100/   # emulator → local server (debug allows HTTP)
 ```
 
-Debug builds allow cleartext HTTP for the local API; release builds do not.
+The web app calls the API on the site that served it; `--dart-define=API_BASE_URL=...` overrides that. On first launch
+the shell hands the old native app's guest session to the web app once (`handoff.html`), so saved people stay.
 
 ## Tests
 
