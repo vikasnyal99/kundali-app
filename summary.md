@@ -425,8 +425,10 @@ on `handoff.html` made the web app refresh the handed-over session (no new guest
 saved person and remove the key; `kundliBack()` returns false on the home screen. The Docker image built locally
 (web compiled in 33 s; 395 MB) and served `/`, `main.dart.js`, `handoff.html` and the API on a read-only, no-capability
 container (about 71 MB RAM).
-**Not verified:** the shell's WebView on a device (the local emulator has no Android system image installed); first
-real run is on the owner's phone.
+**Device check (2026-10-30, after deploying `013e452`):** the owner installed the arm64 shell APK over the old app:
+the splash works and the saved people carried over (session hand-over confirmed on a real phone). Live: `/` serves the web
+app (`no-cache`, gzip; `main.dart.js` 978 KB gzipped, about 0.85 s), `handoff.html` and the API; `api_smoke.sh` passed.
+One-off 5 s stalls seen from the laptop also hit `zivantaai.com`, so they are local DNS/connection delays, not the server.
 
 **APKs:** `mobile/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk` (16.5 MB, modern phones) or
 `app-release.apk` (46 MB, all CPU types).
@@ -434,3 +436,20 @@ real run is on the owner's phone.
 **Notes:** browser back inside the web app leaves the site rather than closing a screen (no URL routes yet); first open
 downloads about 1 MB of app code (gzipped) plus CanvasKit from Google's CDN; Play Store would need more native value
 than a WebView wrapper.
+
+### Running and opening the app
+
+- **Laptop browser (live):** `https://kundaliapi.zivantaai.com/`. Each browser has its own guest session, so the phone's
+  people do not appear there.
+- **Localhost** (separate SQLite database `server/kundli-local.db`, gitignored by `*.db`; PDF reports fail locally with
+  `storage_not_configured` because S3 is only configured on the server):
+  ```bash
+  cd ~/Desktop/kundali-app/mobile && ~/.local/opt/flutter/bin/flutter build web --release -t lib/main.dart
+  cd ../server && DATABASE_URL=sqlite:///./kundli-local.db ../.venv/bin/alembic upgrade head
+  DATABASE_URL=sqlite:///./kundli-local.db ASTROLOGY_MODE=local_experimental WEB_DIR=../mobile/build/web \
+    ../.venv/bin/uvicorn app.main:app --port 8100        # open http://localhost:8100 ; Ctrl+C stops it
+  ```
+  Optional worker (report jobs): `DATABASE_URL=sqlite:///./kundli-local.db ../.venv/bin/python -m app.worker`.
+- **Shipping a screen change:** push, then on the server `sudo git pull && sudo SITE=kundaliapi.zivantaai.com bash
+  infra/server-deploy.sh`. No new APK; the shell only needs rebuilding for native changes
+  (`flutter build apk --release --split-per-abi -t lib/shell.dart`).
