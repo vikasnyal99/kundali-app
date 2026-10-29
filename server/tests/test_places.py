@@ -17,3 +17,14 @@ def test_endpoint_requires_session_and_validates(client):
     h=token(client)
     assert client.get('/v1/places',params={'q':'p'},headers=h).status_code==422
     assert client.get('/v1/places',params={'q':'pune'},headers=h).json()[0]['latitude']==18.5196
+
+def test_pincode_search_lists_post_offices_with_timezone():
+    rows=search('248001')
+    assert rows and all(r['pincode']=='248001' and r['timezone']=='Asia/Kolkata' for r in rows)
+    assert rows[0]['region']=='Dehradun, Uttarakhand' and len(search('2480'))==8
+    assert search('24')==[] and search('999999')==[]
+
+def test_names_fall_back_to_post_offices_for_small_places():
+    rows=search('chamba kalan')
+    assert rows[0]['name']=='Chamba Kalan' and rows[0]['pincode']=='143408'
+    assert search('varanasi')[0].get('pincode') is None  # cities still rank first

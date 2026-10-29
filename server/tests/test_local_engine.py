@@ -80,7 +80,14 @@ def test_service_path_validates_and_requires_birth_time(monkeypatch):
     monkeypatch.setattr(services.settings,'astrology_mode','local_experimental')
     facts=services.calculate(snapshot(P1,{**P2,'time_accuracy':'approximate'}))
     assert 'approximate_birth_time' in facts['warnings'] and len(facts['score']['kootas'])==8
-    with pytest.raises(PermanentFailure,match='birth_time_required'): services.calculate(snapshot(P1,{**P2,'time_accuracy':'unknown'}))
+    day={'birth_timezone':'Asia/Kolkata','time_accuracy':'unknown'}
+    # The Moon stays in one nakshatra and sign all of 1996-01-05 (Delhi) but changes on 1998-02-20.
+    steady=services.calculate(snapshot(P1,{**P2,**day,'birth_date':'1996-01-05','birth_utc':'1996-01-05T06:30:00+00:00'}))
+    assert 'birth_time_unknown_noon' in steady['warnings'] and 'unknown_time_moon_changes_that_day' not in steady['warnings']
+    changing=services.calculate(snapshot(P1,{**P2,**day,'birth_date':'1998-02-20','birth_utc':'1998-02-20T06:30:00+00:00'}))
+    assert {'birth_time_unknown_noon','unknown_time_moon_changes_that_day'}<=set(changing['warnings']) and len(changing['score']['kootas'])==8
+    monkeypatch.setattr(services.settings,'astrology_mode','external'); monkeypatch.setattr(services.settings,'astrology_url','https://provider.test')
+    with pytest.raises(PermanentFailure,match='birth_time_required'): services.calculate(snapshot(P1,{**P2,**day}))
 
 def test_known_upstream_graha_maitri_deviations_are_pinned():
     """Characterises upstream behaviour that differs from the commonly published naisargika table.

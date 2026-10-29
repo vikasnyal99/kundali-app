@@ -35,9 +35,24 @@ def test_local_matches_are_ready_in_the_response_without_jobs(database,client,lo
 
 def test_permanent_failure_is_reported_immediately(database,client,monkeypatch):
     monkeypatch.setattr(settings,'astrology_mode','local_experimental')
-    h=token(client); a=person(client,h,'A')['id']; b=person(client,h,'B',time_accuracy='unknown')['id']
+    def fail(snapshot): raise services.PermanentFailure('invalid_engine_response')
+    monkeypatch.setattr(services,'calculate',fail)
+    h=token(client); a=person(client,h,'A')['id']; b=person(client,h,'B')['id']
     m=client.post('/v1/matches',headers=h,json={'person1_id':a,'person2_id':b}).json()
-    assert (m['status'],m['failure_code'])==('failed','birth_time_required')
+    assert (m['status'],m['failure_code'])==('failed','invalid_engine_response')
+
+def test_unknown_birth_time_is_saved_at_noon_without_a_time(client):
+    h=token(client)
+    p=person(client,h,'U',time_accuracy='unknown',birth_time_local=None)
+    assert p['birth_time_local']=='12:00:00' and p['birth_utc']=='1997-09-14T06:30:00+00:00'
+    r=client.post('/v1/people',headers=h,json={'display_name':'X','birth_date':'1997-09-14','birth_timezone':'Asia/Kolkata','birth_place_name':'Delhi','latitude':28.6,'longitude':77.2,'time_accuracy':'exact'})
+    assert r.status_code==422
+
+def test_report_for_unknown_time_draws_no_lagna_chart():
+    pytest.importorskip('vedic_calc')
+    m=match(); m.snapshot['people'][1].update(time_accuracy='unknown',birth_time_local='12:00:00',birth_utc='1997-09-14T06:30:00+00:00')
+    html=services.report_html(m,'en',None)
+    assert html.count('<svg')==1 and 'Birth time unknown' in html
 
 def test_summary_endpoint_returns_template_and_caches(database,client,local):
     h=token(client); a,b=(person(client,h,n)['id'] for n in ('Deepak','Kirti'))

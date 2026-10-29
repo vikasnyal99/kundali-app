@@ -354,3 +354,28 @@ the AWS console from this machine was blocked by the permission system.
   object → 403, export, account delete → 204, signed URL after delete → 404. `http://65.1.226.15` still answers.
 - **Open:** a real release signing key before any Play Store upload; retire the IP block once no debug builds remain;
   a Pulse redeploy that replaces the Caddyfile drops both blocks (re-run the deploy script per site).
+
+## 13. Person form and unknown birth time (2026-10-30)
+
+**Reported:** every match showed "A birth time is marked as unknown"; the owner wants the form as Full name → one
+birth-place search (also by pincode) that fills itself → no latitude/longitude → time accuracy (no time asked when
+Unknown) → DD / MM / YYYY → HH : MM AM/PM.
+
+**Finding:** that message is the app's text for `birth_time_required`, which the server returned for any person saved
+with accuracy "Unknown". The old form defaulted to "Exact", and widget tests confirm the form sends `exact` unless
+Unknown is chosen. Production data was not inspected, so which people were saved as Unknown is not confirmed.
+
+| Change | Where |
+|---|---|
+| Unknown time no longer fails: the person is saved at 12:00 noon local time (no time needed in the request) and matched with warnings `birth_time_unknown_noon`, plus `unknown_time_moon_changes_that_day` when the Moon changed nakshatra or rashi during that local day (it does on most days). External providers still require a time | `schemas.py`, `local_engine.py` (`moon_at`, `moon_changes_that_day`), `services.py` |
+| PDF for an unknown time: time shown as "unknown", Lagna "—", no Lagna chart (dashed note instead), planets labelled as noon positions | `report.py` |
+| Pincode search (6-digit prefix, at least 3 digits) and post-office fallback for town/village names; 155,546 post offices from GeoNames India postal codes (CC BY 4.0), `app/data/pincodes.tsv.gz` (1.4 MB), built by `scripts/build_pincodes.py` | `places.py` |
+| New form: Full name; one place search (city, town or pincode) that must be chosen from suggestions, with coordinates and timezone hidden; "Birth time known?" Exact/Approximate/Unknown; DD / MM / YYYY boxes (real past dates only); HH : MM boxes with AM/PM, hidden for Unknown; DST choice only shown when the server reports an ambiguous time | `mobile/lib/main.dart` `PersonEditor` |
+| People list shows DD/MM/YYYY and 12-hour time (or "time unknown"); summary page explains unknown-time warnings | `main.dart`, both ARB files |
+
+**Verification:** backend `pytest` 59 passed, 7 skipped (new: noon save without a time, steady day 1996-01-05 vs.
+changing day 1998-02-20, provider mode still requires a time, report without Lagna chart, pincode and post-office
+search). `flutter analyze` clean, `flutter test` 10 passed (new: form body for exact time 9:30 PM → `21:30:00`, unknown
+time sends no time, invalid 31 February and unchosen place are rejected). Release APK rebuilt (55.0 MB).
+Check on the server which saved people are Unknown:
+`sudo docker exec kundli-db psql -U kundli_owner -d kundli -c "select data->>'time_accuracy', count(*) from people group by 1"`.

@@ -3,7 +3,8 @@
 Never presents upstream's relationship verdict as a factual prediction. Every
 result still passes services.validate_facts before it is stored.
 """
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timezone
+from zoneinfo import ZoneInfo
 
 VERSION='vedic-calc-620d54560ee7+swe-2.10.3.2'
 RULESET='vedic-calc-ashtakoota-620d54560ee7+naisargika-maitri-v1'
@@ -35,13 +36,22 @@ def boundary_distance(longitude):
     return min(min(longitude%NAKSHATRA_SPAN,NAKSHATRA_SPAN-longitude%NAKSHATRA_SPAN),min(longitude%30,30-longitude%30))
 
 def moon(person):
-    from vedic_calc import calculate_chart
-    from vedic_calc.core.constants import Planet, Ayanamsa
     # birth_utc is produced by schemas.PersonInput.utc(); pass UTC components with a zero offset
     # so the library never re-applies a local offset or rolls the date over itself.
-    dt=datetime.fromisoformat(person['birth_utc']).astimezone(timezone.utc)
+    return moon_at(datetime.fromisoformat(person['birth_utc']),person)
+
+def moon_at(instant,person):
+    from vedic_calc import calculate_chart
+    from vedic_calc.core.constants import Planet, Ayanamsa
+    dt=instant.astimezone(timezone.utc)
     chart=calculate_chart(year=dt.year,month=dt.month,day=dt.day,hour=dt.hour,minute=dt.minute,second=dt.second,latitude=person['latitude'],longitude=person['longitude'],timezone_offset=0,ayanamsa=Ayanamsa.LAHIRI)
     return chart.planets[Planet.MOON]
+
+def moon_changes_that_day(person):
+    """True when the Moon's nakshatra or sign differs between the start and end of the local birth date."""
+    zone=ZoneInfo(person['birth_timezone']); day=date.fromisoformat(person['birth_date'])
+    ends=[moon_at(datetime.combine(day,t,zone),person) for t in (time(0,0),time(23,59,59))]
+    return ends[0].nakshatra_info.nakshatra!=ends[1].nakshatra_info.nakshatra or ends[0].sign!=ends[1].sign
 
 def sign_index(m):
     return int(m.longitude//30)%12
@@ -58,6 +68,11 @@ def calculate_local(snapshot):
     warnings=['experimental_engine','independent_validation_pending']
     if any(p['time_accuracy']=='approximate' and boundary_distance(m.longitude)<APPROXIMATE_WINDOW_DEGREES for p,m in zip(people,moons)):
         warnings.append('moon_near_boundary_time_sensitive')
+    # Unknown time: calculated for 12:00 noon local time (schemas.PersonInput); say so, and more strongly
+    # when the Moon changed nakshatra or sign during that day, since the result may then differ.
+    unknown=[p for p in people if p.get('time_accuracy')=='unknown']
+    if unknown: warnings.append('birth_time_unknown_noon')
+    if any(moon_changes_that_day(p) for p in unknown): warnings.append('unknown_time_moon_changes_that_day')
     return {
         'score':{'earned':sum(k['earned'] for k in kootas),'possible':36,'kootas':kootas},
         'calculation':{'engine':'vedic-calc + Swiss Ephemeris','version':VERSION,'ruleset':RULESET,'ayanamsa':'lahiri','house_system':'whole_sign','calculated_at':datetime.now(timezone.utc).isoformat(),'role_order':'person1=groom-side; person2=bride-side','validation':'experimental; independent domain review pending','ephemeris':'Swiss Ephemeris default data lookup; Moshier fallback permitted','birth_utc':[p['birth_utc'] for p in people]},

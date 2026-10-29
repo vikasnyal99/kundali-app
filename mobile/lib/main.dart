@@ -431,7 +431,7 @@ class _ShellState extends State<Shell> {
             ),
             title: Text(p['display_name']),
             subtitle: Text(
-              '${p['birth_date']} · ${p['birth_time_local']}\n${p['birth_place_name']} · ${p['birth_timezone']}',
+              '${displayDate(p['birth_date'])} · ${p['time_accuracy'] == 'unknown' ? t('unknownTime') : displayTime(p['birth_time_local'])}\n${p['birth_place_name']}',
             ),
             isThreeLine: true,
             onTap: () => editor(Map<String, dynamic>.from(p)),
@@ -666,44 +666,99 @@ String placeLabel(Map<String, dynamic> p) => [
   p['name'],
   p['region'],
   p['country'],
+  p['pincode'],
 ].where((v) => v != null && v.toString().isNotEmpty).join(', ');
+
+/// Stored dates are YYYY-MM-DD; people read them as DD/MM/YYYY.
+String displayDate(String iso) {
+  final parts = iso.split('-');
+  return parts.length == 3 ? '${parts[2]}/${parts[1]}/${parts[0]}' : iso;
+}
+
+/// Stored times are 24-hour HH:MM:SS; people read them as h:mm AM/PM.
+String displayTime(String value) {
+  final parts = value.split(':');
+  if (parts.length < 2) return value;
+  final h = int.tryParse(parts[0]) ?? 0;
+  return '${h % 12 == 0 ? 12 : h % 12}:${parts[1]} ${h < 12 ? 'AM' : 'PM'}';
+}
 
 class _PersonEditorState extends State<PersonEditor> {
   final form = GlobalKey<FormState>();
-  final fields = <String, TextEditingController>{};
-  bool consent = false, busy = false;
+  final name = TextEditingController();
+  final day = TextEditingController(), month = TextEditingController();
+  final year = TextEditingController();
+  final hour = TextEditingController(), minute = TextEditingController();
+  final focus = List.generate(5, (_) => FocusNode());
+  Map<String, dynamic>? place;
+  String placeText = '';
+  bool consent = false, busy = false, pm = false, askFold = false;
   String accuracy = 'exact';
   int? fold;
   String? error;
-  final labels = {
-    'display_name': 'name',
-    'birth_date': 'date',
-    'birth_time_local': 'time',
-    'birth_place_name': 'place',
-    'latitude': 'latitude',
-    'longitude': 'longitude',
-    'birth_timezone': 'timezone',
-  };
+  String t(String k) => widget.t(k);
+
   @override
   void initState() {
     super.initState();
-    for (final key in labels.keys) {
-      fields[key] = TextEditingController(
-        text:
-            widget.person?[key]?.toString() ??
-            (key == 'birth_timezone' ? 'Asia/Kolkata' : ''),
-      );
+    final p = widget.person;
+    if (p == null) return;
+    name.text = p['display_name'] ?? '';
+    placeText = p['birth_place_name'] ?? '';
+    place = {
+      'label': placeText,
+      'latitude': p['latitude'],
+      'longitude': p['longitude'],
+      'timezone': p['birth_timezone'],
+    };
+    final date = (p['birth_date'] ?? '').toString().split('-');
+    if (date.length == 3) {
+      year.text = date[0];
+      month.text = date[1];
+      day.text = date[2];
     }
-    accuracy = widget.person?['time_accuracy'] ?? 'exact';
-    fold = widget.person?['fold'];
+    accuracy = p['time_accuracy'] ?? 'exact';
+    final time = (p['birth_time_local'] ?? '').toString().split(':');
+    if (accuracy != 'unknown' && time.length >= 2) {
+      final h = int.tryParse(time[0]) ?? 0;
+      pm = h >= 12;
+      hour.text = '${h % 12 == 0 ? 12 : h % 12}'.padLeft(2, '0');
+      minute.text = time[1];
+    }
+    fold = p['fold'];
+    askFold = fold != null;
   }
 
   @override
   void dispose() {
-    for (final c in fields.values) {
+    for (final c in [name, day, month, year, hour, minute]) {
       c.dispose();
     }
+    for (final f in focus) {
+      f.dispose();
+    }
     super.dispose();
+  }
+
+  /// The entered date as YYYY-MM-DD, or null if it is not a real past date.
+  String? isoDate() {
+    final d = int.tryParse(day.text), m = int.tryParse(month.text);
+    final y = int.tryParse(year.text);
+    if (d == null || m == null || y == null || y < 1800) return null;
+    final date = DateTime(y, m, d);
+    if (date.year != y || date.month != m || date.day != d) return null;
+    if (date.isAfter(DateTime.now())) return null;
+    return '${y.toString().padLeft(4, '0')}-${m.toString().padLeft(2, '0')}-${d.toString().padLeft(2, '0')}';
+  }
+
+  /// The entered 12-hour time as 24-hour HH:MM:00, or null if invalid.
+  String? isoTime() {
+    final h = int.tryParse(hour.text), m = int.tryParse(minute.text);
+    if (h == null || m == null || h < 1 || h > 12 || m < 0 || m > 59) {
+      return null;
+    }
+    final h24 = (h % 12) + (pm ? 12 : 0);
+    return '${h24.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:00';
   }
 
   Future<void> save() async {
@@ -713,34 +768,134 @@ class _PersonEditorState extends State<PersonEditor> {
       error = null;
     });
     try {
-      final data = <String, dynamic>{
-        for (final e in fields.entries) e.key: e.value.text.trim(),
-        'time_accuracy': accuracy,
-        'fold': fold,
-      };
-      data['latitude'] = double.parse(data['latitude']);
-      data['longitude'] = double.parse(data['longitude']);
       await widget.api.request(
         widget.person == null ? 'POST' : 'PATCH',
         widget.person == null
             ? '/v1/people'
             : '/v1/people/${widget.person!['id']}',
-        data,
+        {
+          'display_name': name.text.trim(),
+          'birth_place_name': place!['label'],
+          'latitude': place!['latitude'],
+          'longitude': place!['longitude'],
+          'birth_timezone': place!['timezone'],
+          'birth_date': isoDate(),
+          'time_accuracy': accuracy,
+          if (accuracy != 'unknown') 'birth_time_local': isoTime(),
+          'fold': fold,
+        },
       );
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      if (mounted) {
-        setState(() => error = describeError(e, widget.t));
-      }
+      if (!mounted) return;
+      setState(() {
+        error = describeError(e, widget.t);
+        // Only places with daylight saving have a repeated hour; ask only when the server says so.
+        if (e is ApiException && e.details.contains('Ambiguous DST')) {
+          askFold = true;
+          fold ??= 0;
+          error = t('dstHelp');
+        }
+      });
     } finally {
       if (mounted) setState(() => busy = false);
     }
   }
 
+  Widget label(String text) => Padding(
+    padding: const EdgeInsets.only(top: 22, bottom: 8),
+    child: Text(
+      text,
+      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+    ),
+  );
+
+  /// One numeric box of a DD / MM / YYYY or HH : MM group; moves on when full.
+  Widget box(
+    TextEditingController controller,
+    int index,
+    String hint,
+    int length, {
+    int flex = 2,
+  }) => Expanded(
+    flex: flex,
+    child: TextFormField(
+      controller: controller,
+      focusNode: focus[index],
+      keyboardType: TextInputType.number,
+      textAlign: TextAlign.center,
+      maxLength: length,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      style: const TextStyle(fontSize: 18, letterSpacing: 1),
+      decoration: InputDecoration(hintText: hint, counterText: ''),
+      onChanged: (v) {
+        if (v.length == length && index < 4) {
+          focus[index + 1].requestFocus();
+        }
+        setState(() {});
+      },
+    ),
+  );
+
+  Widget separator(String s) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 8),
+    child: Text(
+      s,
+      style: const TextStyle(fontSize: 22, color: Colors.black45),
+    ),
+  );
+
+  Widget placeField() => Autocomplete<Map<String, dynamic>>(
+    initialValue: TextEditingValue(text: placeText),
+    displayStringForOption: placeLabel,
+    optionsBuilder: (value) async {
+      final q = value.text.trim();
+      if (q.length < 2 || q == place?['label']) return const [];
+      try {
+        return List<Map<String, dynamic>>.from(
+          await widget.api.request(
+            'GET',
+            '/v1/places?q=${Uri.encodeQueryComponent(q)}',
+          ),
+        );
+      } catch (_) {
+        return const [];
+      }
+    },
+    onSelected: (p) => setState(() {
+      placeText = placeLabel(p);
+      place = {
+        'label': placeText,
+        'latitude': p['latitude'],
+        'longitude': p['longitude'],
+        'timezone': p['timezone'],
+      };
+    }),
+    fieldViewBuilder: (context, controller, focusNode, submit) =>
+        TextFormField(
+          controller: controller,
+          focusNode: focusNode,
+          decoration: InputDecoration(
+            hintText: t('placeSearchHint'),
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: place != null
+                ? const Icon(Icons.check_circle, color: Colors.green)
+                : null,
+          ),
+          onChanged: (v) {
+            // Typing after a choice means a different place: choose again from the list.
+            if (place != null && v != place!['label']) {
+              setState(() => place = null);
+            }
+          },
+          validator: (_) => place == null ? t('choosePlace') : null,
+        ),
+  );
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text(widget.t(widget.person == null ? 'addPerson' : 'editPerson')),
+      title: Text(t(widget.person == null ? 'addPerson' : 'editPerson')),
     ),
     body: Center(
       child: ConstrainedBox(
@@ -750,94 +905,133 @@ class _PersonEditorState extends State<PersonEditor> {
           child: ListView(
             padding: const EdgeInsets.all(24),
             children: [
-              Text(widget.t('manualPlace')),
-              const SizedBox(height: 20),
-              Autocomplete<Map<String, dynamic>>(
-                displayStringForOption: placeLabel,
-                optionsBuilder: (value) async {
-                  final q = value.text.trim();
-                  if (q.length < 2) return const [];
-                  try {
-                    return List<Map<String, dynamic>>.from(
-                      await widget.api.request(
-                        'GET',
-                        '/v1/places?q=${Uri.encodeQueryComponent(q)}',
-                      ),
-                    );
-                  } catch (_) {
-                    return const []; // manual entry still works offline
-                  }
-                },
-                onSelected: (p) => setState(() {
-                  fields['birth_place_name']!.text = placeLabel(p);
-                  fields['latitude']!.text = '${p['latitude']}';
-                  fields['longitude']!.text = '${p['longitude']}';
-                  fields['birth_timezone']!.text = p['timezone'];
-                }),
-                fieldViewBuilder: (context, controller, focus, submit) =>
-                    TextField(
-                      controller: controller,
-                      focusNode: focus,
-                      decoration: InputDecoration(
-                        labelText: widget.t('placeSearch'),
-                        prefixIcon: const Icon(Icons.search),
-                      ),
-                    ),
+              label(t('name')),
+              TextFormField(
+                controller: name,
+                textCapitalization: TextCapitalization.words,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? t('required') : null,
               ),
-              const SizedBox(height: 16),
-              for (final e in labels.entries)
+              label(t('birthPlace')),
+              placeField(),
+              label(t('precision')),
+              SegmentedButton<String>(
+                segments: [
+                  for (final v in ['exact', 'approximate', 'unknown'])
+                    ButtonSegment(value: v, label: Text(t(v))),
+                ],
+                selected: {accuracy},
+                showSelectedIcon: false,
+                onSelectionChanged: (v) => setState(() => accuracy = v.first),
+              ),
+              if (accuracy == 'unknown')
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: TextFormField(
-                    controller: fields[e.key],
-                    decoration: InputDecoration(labelText: widget.t(e.value)),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) {
-                        return widget.t('required');
-                      }
-                      if (['latitude', 'longitude'].contains(e.key) &&
-                          double.tryParse(v) == null) {
-                        return widget.t('required');
-                      }
-                      return null;
-                    },
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    t('unknownTimeNote'),
+                    style: const TextStyle(fontSize: 13, color: Colors.black54),
                   ),
                 ),
-              DropdownButtonFormField<String>(
-                initialValue: accuracy,
-                decoration: InputDecoration(labelText: widget.t('precision')),
-                items: [
-                  for (final v in ['exact', 'approximate', 'unknown'])
-                    DropdownMenuItem(value: v, child: Text(widget.t(v))),
-                ],
-                onChanged: (v) => setState(() => accuracy = v!),
+              label(t('birthDate')),
+              FormField<void>(
+                validator: (_) => isoDate() == null ? t('invalidDate') : null,
+                builder: (state) => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        box(day, 0, t('dd'), 2),
+                        separator('/'),
+                        box(month, 1, t('mm'), 2),
+                        separator('/'),
+                        box(year, 2, t('yyyy'), 4, flex: 3),
+                      ],
+                    ),
+                    if (state.hasError)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6, left: 12),
+                        child: Text(
+                          state.errorText!,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<int>(
-                initialValue: fold ?? -1,
-                decoration: InputDecoration(labelText: widget.t('dst')),
-                items: [
-                  DropdownMenuItem(
-                    value: -1,
-                    child: Text(widget.t('automatic')),
+              if (accuracy != 'unknown') ...[
+                label(t('birthTime')),
+                FormField<void>(
+                  validator: (_) => isoTime() == null ? t('invalidTime') : null,
+                  builder: (state) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          box(hour, 3, t('hh'), 2),
+                          separator(':'),
+                          box(minute, 4, t('min'), 2),
+                          const SizedBox(width: 12),
+                          SegmentedButton<bool>(
+                            segments: const [
+                              ButtonSegment(value: false, label: Text('AM')),
+                              ButtonSegment(value: true, label: Text('PM')),
+                            ],
+                            selected: {pm},
+                            showSelectedIcon: false,
+                            onSelectionChanged: (v) =>
+                                setState(() => pm = v.first),
+                          ),
+                        ],
+                      ),
+                      if (state.hasError)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6, left: 12),
+                          child: Text(
+                            state.errorText!,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                  DropdownMenuItem(value: 0, child: Text(widget.t('first'))),
-                  DropdownMenuItem(value: 1, child: Text(widget.t('second'))),
-                ],
-                onChanged: (v) => fold = v == -1 ? null : v,
-              ),
-              const SizedBox(height: 16),
+                ),
+              ],
+              if (askFold) ...[
+                label(t('dst')),
+                DropdownButtonFormField<int>(
+                  initialValue: fold ?? 0,
+                  items: [
+                    DropdownMenuItem(value: 0, child: Text(t('first'))),
+                    DropdownMenuItem(value: 1, child: Text(t('second'))),
+                  ],
+                  onChanged: (v) => fold = v,
+                ),
+              ],
+              const SizedBox(height: 20),
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 value: consent,
                 onChanged: (v) => setState(() => consent = v!),
-                title: Text(widget.t('consent')),
+                title: Text(t('consent')),
               ),
-              if (error != null) Text(error!),
-              const SizedBox(height: 20),
+              if (error != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    error!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ),
               FilledButton(
                 onPressed: busy || !consent ? null : save,
-                child: Text(widget.t('save')),
+                child: Text(t('save')),
               ),
             ],
           ),
@@ -1672,6 +1866,31 @@ class _MatchDetailState extends State<MatchDetail> {
                       ),
                     ),
                   ),
+                for (final w in [
+                  'birth_time_unknown_noon',
+                  'unknown_time_moon_changes_that_day',
+                ])
+                  if ((facts['warnings'] as List).contains(w))
+                    Card(
+                      color: const Color(0xfffff4e0),
+                      elevation: 0,
+                      margin: const EdgeInsets.only(top: 12),
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              Icons.schedule,
+                              size: 20,
+                              color: Color(0xff8a5a00),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(child: Text(t('warn_$w'))),
+                          ],
+                        ),
+                      ),
+                    ),
                 section(t('summaryTitle'), [summaryCard()]),
                 section(t('breakdown'), [for (final k in kootas) kootaRow(k)]),
                 if ((summary?['strengths'] as List?)?.isNotEmpty ?? false)

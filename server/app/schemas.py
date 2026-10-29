@@ -7,7 +7,8 @@ class PersonInput(BaseModel):
     model_config = ConfigDict(extra='forbid')
     display_name: str = Field(min_length=1, max_length=100)
     birth_date: date
-    birth_time_local: time
+    # Optional only when the time is unknown; Ashtakoot is then calculated for 12:00 noon local time.
+    birth_time_local: time | None = None
     birth_timezone: str
     birth_place_name: str = Field(min_length=1, max_length=200)
     latitude: float = Field(ge=-90, le=90)
@@ -18,6 +19,8 @@ class PersonInput(BaseModel):
     def validate_birth(self):
         self.display_name = self.display_name.strip()
         if not self.display_name: raise ValueError('Name is required')
+        if self.time_accuracy=='unknown': self.birth_time_local=time(12,0)
+        elif self.birth_time_local is None: raise ValueError('Birth time is required unless it is unknown')
         if self.birth_time_local.tzinfo: raise ValueError('Enter local time without offset')
         try: zone = ZoneInfo(self.birth_timezone)
         except ZoneInfoNotFoundError: raise ValueError('Unknown IANA timezone')

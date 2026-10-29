@@ -358,29 +358,86 @@ void main() {
     },
   );
 
-  testWidgets('place search fills coordinates and timezone for confirmation', (
-    tester,
-  ) async {
-    final backend = await launch(tester);
+  Future<void> openEditor(WidgetTester tester) async {
     await tester.tap(find.text('Saved people').last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Add person'));
     await tester.pumpAndSettle();
-    await tester.enterText(
-      find.widgetWithText(TextField, 'Search birthplace (city)'),
-      'Vara',
-    );
+  }
+
+  Future<void> choosePlace(WidgetTester tester, String query) async {
+    await tester.enterText(find.widgetWithText(TextFormField, 'City, town or 6-digit pincode'), query);
     await tester.pumpAndSettle();
-    expect(backend.requests.last.url.queryParameters['q'], 'Vara');
     await tester.tap(find.text('Varanasi, Uttar Pradesh, IN'));
     await tester.pumpAndSettle();
-    String field(String label) => tester
-        .widget<TextField>(find.widgetWithText(TextField, label))
-        .controller!
-        .text;
-    expect(field('Birth place'), 'Varanasi, Uttar Pradesh, IN');
-    expect(field('Latitude'), '25.3167');
-    expect(field('Longitude'), '83.0104');
-    expect(field('IANA timezone (e.g. Asia/Kolkata)'), 'Asia/Kolkata');
+  }
+
+  Map<String, dynamic> saved(FakeBackend b) => jsonDecode(
+    b.requests.lastWhere((r) => r.method == 'POST' && r.url.path == '/v1/people').body,
+  );
+
+  testWidgets('new person form: one place search, DD/MM/YYYY and 12-hour time', (
+    tester,
+  ) async {
+    final backend = await launch(tester, setup: (b) => b.overrides['POST /v1/people'] = FakeBackend.json({'id': 'n'}, 201));
+    await openEditor(tester);
+    expect(find.text('Latitude'), findsNothing);
+    expect(find.text('Longitude'), findsNothing);
+    await tester.enterText(find.byType(TextFormField).first, 'Deepak Saini');
+    await choosePlace(tester, '221001');
+    expect(backend.requests.last.url.queryParameters['q'], '221001');
+    final boxes = find.byWidgetPredicate((w) => w is TextField && w.maxLength != null);
+    for (final (i, v) in ['05', '03', '1995', '09', '30'].indexed) {
+      await tester.enterText(boxes.at(i), v);
+    }
+    await tester.tap(find.text('PM'));
+    await tester.tap(find.byType(CheckboxListTile));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save details'));
+    await tester.pumpAndSettle();
+    expect(saved(backend), {
+      'display_name': 'Deepak Saini',
+      'birth_place_name': 'Varanasi, Uttar Pradesh, IN',
+      'latitude': 25.3167,
+      'longitude': 83.0104,
+      'birth_timezone': 'Asia/Kolkata',
+      'birth_date': '1995-03-05',
+      'time_accuracy': 'exact',
+      'birth_time_local': '21:30:00',
+      'fold': null,
+    });
+  });
+
+  testWidgets('unknown birth time hides the time and sends none; place must be chosen', (
+    tester,
+  ) async {
+    final backend = await launch(tester, setup: (b) => b.overrides['POST /v1/people'] = FakeBackend.json({'id': 'n'}, 201));
+    await openEditor(tester);
+    await tester.enterText(find.byType(TextFormField).first, 'Kirti');
+    await tester.enterText(find.widgetWithText(TextFormField, 'City, town or 6-digit pincode'), 'Somewhere');
+    await tester.tap(find.text('Unknown'));
+    await tester.pumpAndSettle();
+    expect(find.text('Time of birth'), findsNothing);
+    final boxes = find.byWidgetPredicate((w) => w is TextField && w.maxLength != null);
+    expect(boxes, findsNWidgets(3));
+    for (final (i, v) in ['31', '02', '1996'].indexed) {
+      await tester.enterText(boxes.at(i), v);
+    }
+    await tester.tap(find.byType(CheckboxListTile));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save details'));
+    await tester.pumpAndSettle();
+    expect(find.text('Choose the birth place from the suggestions'), findsOneWidget);
+    expect(find.text('Enter a valid date of birth (DD / MM / YYYY)'), findsOneWidget); // 31 February
+    expect(backend.requests.where((r) => r.url.path == '/v1/people' && r.method == 'POST'), isEmpty);
+
+    await choosePlace(tester, 'Vara');
+    await tester.enterText(boxes.at(0), '29');
+    await tester.tap(find.text('Save details'));
+    await tester.pumpAndSettle();
+    final body = saved(backend);
+    expect(body['time_accuracy'], 'unknown');
+    expect(body.containsKey('birth_time_local'), isFalse);
+    expect(body['birth_date'], '1996-02-29');
   });
 }

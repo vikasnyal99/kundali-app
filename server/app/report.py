@@ -7,8 +7,12 @@ from html import escape
 from . import jyotish
 from .summary import context, template, num
 
-WARNINGS={'en':{'experimental_engine':'Experimental calculation engine.','independent_validation_pending':'Independent validation of the rules is pending.','approximate_birth_time':'At least one birth time is approximate.','moon_near_boundary_time_sensitive':'The Moon is near a nakshatra or sign boundary; an approximate birth time could change the result.'},
- 'hi':{'experimental_engine':'प्रायोगिक गणना इंजन।','independent_validation_pending':'नियमों का स्वतंत्र सत्यापन लंबित है।','approximate_birth_time':'कम से कम एक जन्म समय अनुमानित है।','moon_near_boundary_time_sensitive':'चंद्रमा नक्षत्र या राशि सीमा के निकट है; अनुमानित जन्म समय से परिणाम बदल सकता है।'}}
+WARNINGS={'en':{'experimental_engine':'Experimental calculation engine.','independent_validation_pending':'Independent validation of the rules is pending.','approximate_birth_time':'At least one birth time is approximate.','moon_near_boundary_time_sensitive':'The Moon is near a nakshatra or sign boundary; an approximate birth time could change the result.',
+  'birth_time_unknown_noon':'A birth time is unknown, so that chart was calculated for 12:00 noon; its Lagna is not shown.',
+  'unknown_time_moon_changes_that_day':'On the day with the unknown birth time the Moon changed nakshatra or rashi, so the guna score may differ; a birth time is needed for a reliable result.'},
+ 'hi':{'experimental_engine':'प्रायोगिक गणना इंजन।','independent_validation_pending':'नियमों का स्वतंत्र सत्यापन लंबित है।','approximate_birth_time':'कम से कम एक जन्म समय अनुमानित है।','moon_near_boundary_time_sensitive':'चंद्रमा नक्षत्र या राशि सीमा के निकट है; अनुमानित जन्म समय से परिणाम बदल सकता है।',
+  'birth_time_unknown_noon':'एक जन्म समय अज्ञात है, इसलिए वह कुंडली दोपहर 12:00 बजे के अनुसार बनाई गई है; उसका लग्न नहीं दिखाया गया।',
+  'unknown_time_moon_changes_that_day':'अज्ञात जन्म समय वाले दिन चंद्रमा ने नक्षत्र या राशि बदली, इसलिए गुण बदल सकते हैं; विश्वसनीय परिणाम के लिए जन्म समय आवश्यक है।'}}
 LABELS={'en':{'title':'Kundli matching report','subtitle':'Ashta Koota Guna Milan','invocation':'॥ श्री गणेशाय नमः ॥',
   'groom':'Groom-side (Person 1)','bride':'Bride-side (Person 2)','gunas':'gunas','score':'Gunas matched','of':'out of 36',
   'scale':'Traditional scale: below 18 not recommended · 18–24 average · 25–32 good · 33–36 excellent',
@@ -22,7 +26,8 @@ LABELS={'en':{'title':'Kundli matching report','subtitle':'Ashta Koota Guna Mila
   'dosha_note':'Dosha analysis','method':'Method and notes','engine':'Engine','version':'Version','ruleset':'Ruleset','ayanamsa':'Ayanamsa','calculated_at':'Calculated at (UTC)',
   'validation':'Validation status','warnings':'Calculation notes','ai':'Explanations written with AI from the calculated facts; scores are not AI-generated.',
   'disclaimer':'Traditional astrology is a cultural framework, not scientific evidence of relationship success. Consider consent, communication and shared values.',
-  'exact':'exact','approximate':'approximate','unknown':'unknown','footer':'KundliMilan · Guna Milan report'},
+  'exact':'exact','approximate':'approximate','unknown':'unknown','footer':'KundliMilan · Guna Milan report',
+  'no_chart':'Birth time unknown: the Lagna chart needs the exact time and is not drawn.','noon':'Positions at 12:00 noon (birth time unknown).'},
  'hi':{'title':'कुंडली मिलान रिपोर्ट','subtitle':'अष्टकूट गुण मिलान','invocation':'॥ श्री गणेशाय नमः ॥',
   'groom':'वर पक्ष (व्यक्ति 1)','bride':'वधू पक्ष (व्यक्ति 2)','gunas':'गुण','score':'मिलने वाले गुण','of':'36 में से',
   'scale':'पारंपरिक मान: 18 से कम अनुशंसित नहीं · 18–24 मध्यम · 25–32 उत्तम · 33–36 अति उत्तम',
@@ -36,7 +41,8 @@ LABELS={'en':{'title':'Kundli matching report','subtitle':'Ashta Koota Guna Mila
   'dosha_note':'दोष विचार','method':'गणना पद्धति एवं टिप्पणियाँ','engine':'इंजन','version':'संस्करण','ruleset':'नियम-सेट','ayanamsa':'अयनांश','calculated_at':'गणना समय (UTC)',
   'validation':'सत्यापन स्थिति','warnings':'गणना संबंधी टिप्पणियाँ','ai':'विवेचन गणना किए गए तथ्यों से AI द्वारा लिखा गया है; गुण AI द्वारा नहीं निकाले गए।',
   'disclaimer':'पारंपरिक ज्योतिष एक सांस्कृतिक दृष्टिकोण है, रिश्ते की सफलता का वैज्ञानिक प्रमाण नहीं। आपसी सहमति, संवाद और साझा मूल्यों पर भी विचार करें।',
-  'exact':'सटीक','approximate':'अनुमानित','unknown':'अज्ञात','footer':'KundliMilan · गुण मिलान रिपोर्ट'}}
+  'exact':'सटीक','approximate':'अनुमानित','unknown':'अज्ञात','footer':'KundliMilan · गुण मिलान रिपोर्ट',
+  'no_chart':'जन्म समय अज्ञात: लग्न कुंडली के लिए सटीक समय आवश्यक है, इसलिए यह नहीं बनाई गई।','noon':'ग्रह स्थिति दोपहर 12:00 बजे की (जन्म समय अज्ञात)।'}}
 
 CSS='''
 @page{size:A4;margin:16mm 15mm 18mm;background:#fffaf0;
@@ -86,6 +92,7 @@ tr.total td{background:#f6e3c0;font-weight:700;color:#7a2e1d;border-top:1pt soli
 .nchart{position:relative;width:78mm;height:78mm;margin:0 auto}
 .nchart svg{position:absolute;left:0;top:0}
 .nchart .pl{position:absolute;width:30%;text-align:center;font-weight:700;font-size:9.6pt;line-height:1.25;transform:translateY(-50%)}
+.nochart{width:78mm;height:78mm;margin:0 auto;border:1.2pt dashed #c9a27a;display:flex;align-items:center;justify-content:center;text-align:center;padding:8mm;box-sizing:border-box;color:#7a6656;font-size:9.5pt}
 .charts .cn{font-family:HEADFONTS;color:#7a2e1d;font-size:11pt;margin-bottom:1.5mm}
 .two{display:flex;gap:5mm}.two>div{flex:1}
 .two table td,.two table th{font-size:8.6pt;padding:1.1mm 1.6mm}
@@ -127,7 +134,7 @@ def report_html(match,locale,summary=None):
             moon=d['planets']['moon']
             extra=f"<br>{e(L['rashi'].split(' (')[0])}: {e(jyotish.name('sign',moon['sign'],locale))} · {e(L['nakshatra'].split(' –')[0])}: {e(jyotish.name('nakshatra',moon['nakshatra'],locale))}"
         return (f"<div class='side'><div class='role'>{e(L['groom' if i==0 else 'bride'])}</div><div class='nm'>{names[i]}</div>"
-                f"<div class='meta'>{e(p['birth_date'])} · {e(str(p['birth_time_local'])[:5])} · {e(p['birth_place_name'])}{extra}</div></div>")
+                f"<div class='meta'>{e(p['birth_date'])} · {e(L['unknown'] if p['time_accuracy']=='unknown' else str(p['birth_time_local'])[:5])} · {e(p['birth_place_name'])}{extra}</div></div>")
 
     doshas=''.join(f"<span class='chip bad'>{e(n)}</span>" for n in ctx['dosha_names']) or f"<span class='chip ok'>{e(L['no_dosha'])}</span>"
     cover=f'''<section class="page">
@@ -144,13 +151,13 @@ def report_html(match,locale,summary=None):
     def row(label,values): return f"<tr><td class='k'>{e(label)}</td>"+''.join(f'<td>{v}</td>' for v in values)+'</tr>'
     rows=[row(L['name'],[f'<b>{n}</b>' for n in names]),
           row(L['dob'],[e(p['birth_date']) for p in people]),
-          row(L['tob'],[f"{e(str(p['birth_time_local'])[:5])} ({e(L.get(p['time_accuracy'],p['time_accuracy']))})" for p in people]),
+          row(L['tob'],[e(L['unknown']) if p['time_accuracy']=='unknown' else f"{e(str(p['birth_time_local'])[:5])} ({e(L.get(p['time_accuracy'],p['time_accuracy']))})" for p in people]),
           row(L['place'],[e(p['birth_place_name']) for p in people]),
           row(L['coords'],[f"{float(p['latitude']):.4f}, {float(p['longitude']):.4f}" for p in people]),
           row(L['tz'],[e(p['birth_timezone']) for p in people])]
     if all(details):
         def ava(key,kind=''): return [e(jyotish.name(kind,d['avakhada'][key],locale)) for d in details]
-        rows+=[row(L['lagna'],[f"{e(jyotish.name('sign',d['lagna']['sign'],locale))} {dms(d['lagna']['degree'])}" for d in details]),
+        rows+=[row(L['lagna'],['—' if p['time_accuracy']=='unknown' else f"{e(jyotish.name('sign',d['lagna']['sign'],locale))} {dms(d['lagna']['degree'])}" for p,d in zip(people,details)]),
                row(L['rashi'],[e(jyotish.name('sign',d['planets']['moon']['sign'],locale)) for d in details]),
                row(L['rashi_lord'],ava('sign_lord','planet')),
                row(L['nakshatra'],[f"{e(jyotish.name('nakshatra',d['planets']['moon']['nakshatra'],locale))} – {d['planets']['moon']['pada']}" for d in details]),
@@ -174,16 +181,18 @@ def report_html(match,locale,summary=None):
 
     charts=''
     if all(details):
-        def planet_table(d):
+        def planet_table(d,unknown=False):
             body=''.join(f"<tr><td>{e(jyotish.name('planet',k,locale))}{'*' if p['retrograde'] and k not in ('rahu','ketu') else ''}</td><td>{e(jyotish.name('sign',p['sign'],locale))}</td><td>{dms(p['degree'])}</td><td>{e(jyotish.name('nakshatra',p['nakshatra'],locale))} – {p['pada']}</td></tr>"
                          for k,p in d['planets'].items())
             lagna=d['lagna']
             first=f"<tr><td><b>{e(L['lagna'].split(' (')[0])}</b></td><td>{e(jyotish.name('sign',lagna['sign'],locale))}</td><td>{dms(lagna['degree'])}</td><td>{e(jyotish.name('nakshatra',lagna['nakshatra'],locale))} – {lagna['pada']}</td></tr>"
+            if unknown: return f"<table><tr><th>{e(L['planet'])}</th><th>{e(L['sign'])}</th><th>{e(L['degree'])}</th><th>{e(L['nak'])}</th></tr>{body}</table><div class='small muted'>{e(L['noon'])}</div>"
             return f"<table><tr><th>{e(L['planet'])}</th><th>{e(L['sign'])}</th><th>{e(L['degree'])}</th><th>{e(L['nak'])}</th></tr>{first}{body}</table>"
         charts=(f'<section class="page"><h2>{e(L["charts"])}</h2><div class="charts">'
-                +''.join(f"<div><div class='cn'>{names[i]}</div>{jyotish.north_chart(d,locale)}</div>" for i,d in enumerate(details))
+                # The Lagna depends on the exact time, so no chart is drawn for an unknown birth time.
+                +''.join(f"<div><div class='cn'>{names[i]}</div>"+(f"<div class='nochart'>{e(L['no_chart'])}</div>" if people[i]['time_accuracy']=='unknown' else jyotish.north_chart(d,locale))+"</div>" for i,d in enumerate(details))
                 +f'</div><h2>{e(L["planets"])}</h2><div class="two">'
-                +''.join(f"<div><h3>{names[i]}</h3>{planet_table(d)}</div>" for i,d in enumerate(details))
+                +''.join(f"<div><h3>{names[i]}</h3>{planet_table(d,people[i]['time_accuracy']=='unknown')}</div>" for i,d in enumerate(details))
                 +f"</div><div class='small muted'>{e(L['retro'])}</div></section>")
 
     note_html=''.join(f"<div class='note'><span class='nh'>{e(k['name'])}</span> <span class='pts {pts_class(k['earned'],k['possible'])}'>{e(num(k['earned']))} / {e(num(k['possible']))}</span><br>{e(notes.get(k['key'],''))}</div>" for k in ctx['kootas'])

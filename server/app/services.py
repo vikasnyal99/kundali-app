@@ -29,13 +29,14 @@ def validate_facts(facts,version=None,ruleset='provider-validated-v1'):
     except (KeyError,TypeError,ValueError): raise PermanentFailure('invalid_engine_response')
 
 def calculate(snapshot):
-    if any(p['time_accuracy']=='unknown' for p in snapshot['people']): raise PermanentFailure('birth_time_required')
     if settings.astrology_mode == 'local_experimental':
         from .local_engine import calculate_local, VERSION, RULESET
         facts = validate_facts(calculate_local(snapshot),VERSION,RULESET)
         if any(p['time_accuracy']=='approximate' for p in snapshot['people']): facts['warnings'].append('approximate_birth_time')
         return facts
     if not settings.astrology_url: raise PermanentFailure('calculation_unavailable')
+    # External providers have not been checked for the noon convention used locally for unknown times.
+    if any(p['time_accuracy']=='unknown' for p in snapshot['people']): raise PermanentFailure('birth_time_required')
     # Identifiers and names are deliberately excluded from the external request.
     fields=('birth_utc','latitude','longitude','birth_timezone','time_accuracy')
     body={'people':[{k:p[k] for k in fields} for p in snapshot['people']],'settings':snapshot['settings']}
