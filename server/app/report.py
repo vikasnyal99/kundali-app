@@ -89,9 +89,9 @@ tr.total td{background:#f6e3c0;font-weight:700;color:#7a2e1d;border-top:1pt soli
 .charts .cn{font-family:HEADFONTS;color:#7a2e1d;font-size:11pt;margin-bottom:1.5mm}
 .two{display:flex;gap:5mm}.two>div{flex:1}
 .two table td,.two table th{font-size:8.6pt;padding:1.1mm 1.6mm}
-.note{margin-bottom:1.6mm;page-break-inside:avoid;font-size:9.3pt;line-height:1.38}
+.note{margin-bottom:1.4mm;page-break-inside:avoid;font-size:9.1pt;line-height:1.35}
 .note .nh{font-weight:700;color:#7a2e1d}
-ul{margin:1mm 0 3mm;padding-left:5mm}li{margin-bottom:1mm}
+ul{margin:.6mm 0 2mm;padding-left:5mm}li{margin-bottom:.6mm;font-size:9.4pt}
 .disc{font-size:8.5pt;color:#6b5a4a;border-top:1pt solid #d9a441;padding-top:2mm;margin-top:4mm}
 '''
 

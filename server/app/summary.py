@@ -13,7 +13,7 @@ from .config import settings
 from . import jyotish
 
 log=logging.getLogger('summary')
-VERSION='v1'
+VERSION='v2'  # bump when the prompt changes so cached summaries regenerate
 KOOTA_ORDER=['varna','vashya','tara','yoni','graha_maitri','gana','bhakoot','nadi']
 KOOTA_NAMES={'en':{'varna':'Varna','vashya':'Vashya','tara':'Tara','yoni':'Yoni','graha_maitri':'Graha Maitri','gana':'Gana','bhakoot':'Bhakoot','nadi':'Nadi'},
  'hi':{'varna':'वर्ण','vashya':'वश्य','tara':'तारा','yoni':'योनि','graha_maitri':'ग्रह मैत्री','gana':'गण','bhakoot':'भकूट','nadi':'नाड़ी'}}
@@ -106,7 +106,7 @@ Rules:
 - Refer to the two people only as {P1} and {P2}, exactly with the braces. {P1} holds the groom-side rule position, {P2} the bride-side.
 - The listed doshas come from kootas with zero points; say traditional cancellation (parihar) rules exist but were not evaluated. Manglik was not evaluated.
 - Be balanced and respectful; no fear, no guarantees, no predictions about health or children, no advice to marry or not marry. Mention once that this is a cultural tradition, not a prediction.
-- headline: one short line naming the traditional verdict. overview: 3-5 sentences. kootas: exactly one 1-2 sentence note per koota key explaining what the two attributes mean together. strengths/considerations: 2-4 short points each (considerations may be empty if nothing is weak). guidance: 2-3 practical sentences.
+- headline: one short line naming the traditional verdict. overview: 3-5 sentences. kootas: exactly one short sentence (at most 30 words) per koota key explaining what the two attributes mean together. strengths/considerations: 2-3 short points each (considerations may be empty if nothing is weak). guidance: 2 practical sentences.
 - Write in {language}.'''
 
 SCHEMA={'type':'object','additionalProperties':False,'required':['headline','overview','kootas','strengths','considerations','guidance'],'properties':{
