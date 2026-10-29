@@ -1,8 +1,8 @@
 # KundliMilan AI — Project Status
 
-**Updated:** 2026-10-29 (third session: EC2 deployment)  
+**Updated:** 2026-10-29 (fourth session: instant matches, OpenAI summaries, new PDF; see §11)  
 **Workspace:** `/home/vikas/Desktop/kundali-app`  
-**Deployed 2026-10-29** to EC2 `pulse-start` at `http://65.1.226.15` (commits `ed4ca15`, `0960d13` pushed to `main`). See §10.
+**Deployed 2026-10-29** to EC2 `pulse-start` at `http://65.1.226.15`; live at commit `aa2418b` on `main`. See §10 and §11.
 
 ## 1. Product and sources of truth
 
@@ -206,7 +206,7 @@ Disposable containers used: `kundli-dev-postgres-1`, now stopped (its volume rem
 ## 8. Decisions needed from you
 
 1. **Engine:** accept AGPL obligations, obtain permission, implement reviewed rule tables in-house, or choose a provider. Also, who will domain-review the rules and supply reference cases?
-2. **AI explanations:** which provider and model (the key must stay server-side), or keep deterministic-only for the trial.
+2. ~~**AI explanations**~~ **decided 2026-10-29:** OpenAI `gpt-4.1-mini`, explanation text only, live (§11). Still open: a consent/privacy notice that chart attributes are sent to OpenAI.
 3. **Account recovery:** which sign-in method, if any, for the trial.
 4. **Manglik:** which rule variant should be validated, or keep it unavailable.
 5. **Local tooling:** whether to `docker login quay.io` so the MinIO tests can run (the Android SDK and JDK 17 are now installed).
@@ -219,8 +219,9 @@ Continue KundliMilan AI. Read summary.md (current status) and README.md, then th
 docs/USER_FLOWS.md, docs/SCREEN_SPEC.md, design/DESIGN_SYSTEM.md, architecture/ and docs/DEPLOYMENT.md.
 Verify claims against the code before changing it. Never fabricate scores (AI must not produce scores), never
 type secrets into consoles, and commit, push or deploy only when explicitly asked. The live server is described in
-summary.md §10 and docs/DEPLOYMENT.md §8 (deploy via infra/server-deploy.sh over SSM). Next: open items in §10,
-then the decisions in §8. Update summary.md at the end.
+summary.md §10–§11 and docs/DEPLOYMENT.md §8 (the owner deploys over SSM: git pull, then infra/server-deploy.sh;
+never only docker compose, which skips migrations). Next: open items in §10 and §11, then the decisions in §8.
+Update summary.md at the end.
 ```
 
 ## 10. Deployment (2026-10-29)
@@ -261,29 +262,75 @@ single-file mount pointed at a stale copy of the Caddyfile (now reloaded via std
    and completed, probe object and all test data removed (DB: 0 users/people/reports). Live re-test: a deleted
    account's PDF returns 404.
 2. **Hostname + HTTPS:** none yet. Release APK and web build need HTTPS (WebCrypto/secure storage on web, cleartext blocked in release).
-3. **OpenAI key** pasted in chat on 2026-10-29: not used or stored; owner should revoke it. AI may only write
-   explanations around engine scores (not built; needs consent/privacy notice).
+3. ~~**OpenAI key**~~ **resolved 2026-10-29:** summaries are live (§11). The key is in the server's `.env` (entered at the
+   deploy prompt) and in the laptop's gitignored `.env`; it is not in git. The key pasted in chat earlier should still be
+   revoked if it is a different one. A privacy notice about sending chart attributes to OpenAI is still missing.
 4. AGPL `LICENSE` + in-app source link; privacy notice; release signing; backups (`pg_dump` of `kundli-db`); monitoring.
 5. A Pulse redeploy that replaces the Caddyfile drops the KundliMilan block; re-run `infra/server-deploy.sh`.
 
 ## 11. Speed, AI summaries and the new PDF (2026-10-29, fourth session)
 
-**Why matches felt slow:** the calculation takes about 1 ms, but every match went through the job queue
-(worker polled every 3 s) and the app polled every 3 s; one network error stopped polling for good, and the score only
-appeared as a small line at the bottom of the match screen. Measured live before the change: about 2.8 s per match.
-A match with an "unknown" birth time fails with `birth_time_required`, which the app showed only as "Needs attention".
+**Reported by the owner:** "Generate match" gave no feedback for a long time (e.g. Deepak & Kirti Saini, Vikas &
+Nikita); the PDF did not look like a professional janam patri milan; the summary should be its own page, with a
+"Generate full report" button at the end that produces a downloadable PDF; summaries should use OpenAI.
+
+**Root cause of the slowness:** OpenAI was not involved: it was not used anywhere. The calculation takes about 1 ms,
+but every match went through the job queue (worker polled every 3 s) and the app polled every 3 s. One network error
+stopped polling for good, and the score only appeared as a small line at the bottom of the match screen. Measured live
+before the change: about 2.8 s per match. A person saved with an "unknown" birth time makes the match fail with
+`birth_time_required`, which the app showed only as "Needs attention". Production logs were **not** checked: opening
+the AWS console from this machine was blocked by the permission system.
+
+### What changed
 
 | Change | Where |
 |---|---|
-| Local-engine matches (and comparisons, retries) are computed inside the request; provider mode still uses the queue | `server/app/main.py` `compute()` |
+| Local-engine matches, comparisons and retries are computed inside the request; provider mode still uses the queue | `server/app/main.py` `compute()` |
 | Worker polls every 1 s (`WORKER_POLL_SECONDS`) | `config.py`, `.env.example` |
-| OpenAI summary around the engine facts, deterministic template fallback, number guard, no personal data sent, cached per locale | `server/app/summary.py`, `GET /v1/matches/{id}/summary?locale=` |
-| Summary pre-generated in the background after `POST /v1/matches` when AI is enabled | `main.py` `warm_summary` |
+| OpenAI summary around the engine facts (`gpt-4.1-mini`, JSON schema output). Only the koota table, Moon-chart attributes and dosha flags are sent: no names, dates or places (people are `{P1}`/`{P2}`, filled in locally). Any digit in the answer, a missing koota note or a stray placeholder rejects it in favour of the template (not cached, so the next view retries). | `server/app/summary.py`, `GET /v1/matches/{id}/summary?locale=` |
+| Deterministic EN/HI template summary when no key is set or a call fails | `summary.py` `template()` |
+| Summary cached per match and locale; pre-generated in the background after `POST /v1/matches`; `VERSION` (now `v2`) regenerates cached text when the prompt changes | `main.py` `warm_summary`, `summary.py` |
 | `matches.summaries` JSON column | `db.py`, `migrations/versions/002_match_summaries.py` |
-| New 4-page janam patri milan PDF: cover with guna medallion and Ashtakoot table (with each person's varna/vashya/yoni/gana/nadi), birth details and Avakhada chakra, North Indian Lagna charts and planetary positions, koota-wise reading, strengths, considerations, guidance, method | `server/app/report.py`, `server/app/jyotish.py` |
+| 4-page janam patri milan PDF: Ganesh invocation, couple card, guna medallion, verdict scale and dosha badges, Ashtakoot table with each person's varna/vashya/tara/yoni/maitri/gana/bhakoot/nadi; birth details and Avakhada chakra with the overview and dosha notes; North Indian Lagna charts and planetary positions; koota-wise reading, strengths, considerations, guidance; method notes and disclaimer | `server/app/report.py` |
+| Chart details (Lagna, nine grahas, Avakhada) recomputed for display from the stored birth data; Hindi names for signs, nakshatras, grahas and Avakhada values; North Indian chart with SVG lines and HTML labels (WeasyPrint's SVG text detaches Devanagari vowel signs) | `server/app/jyotish.py` |
 | Report list returns the couple's names and score | `main.py` `report_json` |
-| App: a single match opens a new summary page immediately; "Generate full report" at the end polls and opens the PDF; polling every 1–1.5 s and tolerant of brief network drops; failure codes explained (e.g. unknown birth time) | `mobile/lib/main.dart`, both ARB files |
-| Deploy script asks once (silently) for the OpenAI key | `infra/server-deploy.sh` |
+| App: a single match opens a new summary page at once (score, band, doshas, AI summary, koota cards, strengths, considerations, guidance); "Generate full report" at the end polls every 1.5 s and opens the PDF, then shows "Download PDF"; match polling every 1 s, tolerant of up to 5 failed polls; failure codes explained; Reports tab shows names, score and language | `mobile/lib/main.dart`, both ARB files |
+| Deploy script asks once, without echo, for the OpenAI key and stores it only in the server `.env` | `infra/server-deploy.sh`, `docs/DEPLOYMENT.md` |
 
-**Upstream rule note (for the domain reviewer):** vedic-calc gives Yoni 3/4 when both people have the same animal and
-the same gender; most published tables give 4/4. Not changed.
+### Commits (all pushed to `main` and deployed)
+
+| Commit | Content |
+|---|---|
+| `cff728c` | Instant matches, OpenAI summaries, new PDF, summary page, deploy prompt |
+| `fb1d9aa` | Method notes as compact lines so the PDF stays at four pages (real engine version strings had pushed it to five) |
+| `aa2418b` | One short sentence per koota note and tighter list spacing (English AI text had spilled onto a fifth page); summary `VERSION` → `v2` |
+
+### Verification
+
+- Backend `pytest`: **55 passed, 7 skipped** (new `tests/test_summary.py`: inline calculation without jobs, immediate
+  `birth_time_required`, template summary and caching, mocked OpenAI with names filled in and no birth data sent,
+  rejection of invented numbers/missing notes/stray placeholders, full report with real chart details). Migration 002
+  applied to a scratch SQLite database.
+- Mobile: `flutter analyze` clean; `flutter test` **9 passed** (new: match opens its summary; full report polls and
+  requests the download URL).
+- Live OpenAI from the laptop: EN and HI summaries in about 6 s. The first prompt let the model garble the Hindi total
+  ("कुल 25.5 में से 36 गुण") and misspell terms; the prompt now forbids all numbers and requires the given names.
+- Live server after the final deploy (throwaway guests, deleted afterwards): match ready in 0.4 s (was about 2.8 s);
+  pre-warmed summary 0.07 s, cold Hindi summary about 6.4 s, `source: ai`; PDF ready in about 3.4 s; two pairs × EN/HI
+  all 4 pages.
+
+### Notes and open items
+
+1. **Deploying:** the first attempt rebuilt without `git pull`, so every build layer was `CACHED` and the old code kept
+   running. Always `sudo git pull`, check `git log --oneline -1`, then `infra/server-deploy.sh` (it also runs migrations).
+2. **Secrets:** the owner put the OpenAI key in `.env.example`, which is tracked in a public repo. It was moved to the
+   gitignored `.env` (mode 600) before committing; staged diffs were checked for `sk-` keys before each push.
+3. **Old reports** keep their old layout: an existing report for a match and language is reused.
+4. **Flutter SDK** is now at `~/.local/opt/flutter` (3.47.8 stable); the previous `/tmp/kundli-flutter` had disappeared.
+   APK: `flutter build apk --debug --dart-define=API_BASE_URL=http://65.1.226.15` with `JAVA_HOME=~/.local/opt/jdk17`,
+   `GRADLE_OPTS=-Dorg.gradle.vfs.watch=false`. The owner runs the debug APK; a release APK (much faster) needs HTTPS.
+5. **Privacy:** add a notice that chart attributes (not names or birth data) are sent to OpenAI.
+6. **Upstream rule note (for the domain reviewer):** vedic-calc gives Yoni 3/4 when both people have the same animal and
+   the same gender; most published tables give 4/4. Not changed.
+7. iOS was discussed and deferred: the Flutter project is iOS-ready, but builds need macOS (e.g. Codemagic) and an
+   Apple Developer account.
