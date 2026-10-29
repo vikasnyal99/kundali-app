@@ -7,6 +7,7 @@ from sqlalchemy import select, delete, or_, and_
 from .db import Session, Job, Match, Report, now
 from .config import settings
 from .services import calculate, store_report, s3, PermanentFailure
+from . import summary as summaries
 
 log=logging.getLogger('worker')
 stopping=False
@@ -31,9 +32,13 @@ def run_once():
         if kind=='match':
             if obj: result=calculate(obj.snapshot)
         elif kind=='report':
+            text=None
             with Session() as db:
                 match=db.get(Match,obj.match_id) if obj else None
-            if obj and match: result=store_report(obj,match)
+                if obj and match:
+                    try: text=summaries.ensure(db,match,obj.locale)
+                    except Exception: log.warning('report %s: summary unavailable, using template',target_id)
+            if obj and match: result=store_report(obj,match,text)
         elif kind=='delete_object': s3().delete_object(Bucket=settings.s3_bucket,Key=payload['key'])
         else: raise PermanentFailure('unknown_job')
     except PermanentFailure as exc: error=str(exc); permanent=True

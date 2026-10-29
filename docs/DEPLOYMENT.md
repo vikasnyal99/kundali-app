@@ -163,3 +163,13 @@ replaces the Caddyfile removes the block; re-run the deploy script.
 Caddy's read-only Caddyfile mount on this host was found pointing at an older copy of the file, so the script
 validates and reloads by piping the host file over stdin (`caddy reload --config /dev/stdin`). A plain
 `caddy reload` inside the container would load the stale copy and drop the KundliMilan route.
+
+### Match summaries (OpenAI)
+
+Summaries are written by OpenAI when `OPENAI_API_KEY` is set in the server's `/opt/kundali-app/.env` (the deploy
+script asks for it once, without echo, when run from an interactive shell). `OPENAI_MODEL` defaults to `gpt-4.1-mini`.
+Only the koota table, Moon-chart attributes and dosha flags are sent: no names, birth dates, times or places. Answers
+that mention numbers not in the facts, or that fail, fall back to the built-in templates (not cached, so the next view
+retries). Successful summaries are cached per match and language in `matches.summaries` (migration `002`).
+After changing the key: `docker compose -f infra/compose.server.yml up -d` (recreates the API and worker with the new env).
+Check: `docker logs kundli-api 2>&1 | grep summary` shows only match IDs and HTTP status codes on failure.

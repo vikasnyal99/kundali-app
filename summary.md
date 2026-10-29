@@ -265,3 +265,25 @@ single-file mount pointed at a stale copy of the Caddyfile (now reloaded via std
    explanations around engine scores (not built; needs consent/privacy notice).
 4. AGPL `LICENSE` + in-app source link; privacy notice; release signing; backups (`pg_dump` of `kundli-db`); monitoring.
 5. A Pulse redeploy that replaces the Caddyfile drops the KundliMilan block; re-run `infra/server-deploy.sh`.
+
+## 11. Speed, AI summaries and the new PDF (2026-10-29, fourth session)
+
+**Why matches felt slow:** the calculation takes about 1 ms, but every match went through the job queue
+(worker polled every 3 s) and the app polled every 3 s; one network error stopped polling for good, and the score only
+appeared as a small line at the bottom of the match screen. Measured live before the change: about 2.8 s per match.
+A match with an "unknown" birth time fails with `birth_time_required`, which the app showed only as "Needs attention".
+
+| Change | Where |
+|---|---|
+| Local-engine matches (and comparisons, retries) are computed inside the request; provider mode still uses the queue | `server/app/main.py` `compute()` |
+| Worker polls every 1 s (`WORKER_POLL_SECONDS`) | `config.py`, `.env.example` |
+| OpenAI summary around the engine facts, deterministic template fallback, number guard, no personal data sent, cached per locale | `server/app/summary.py`, `GET /v1/matches/{id}/summary?locale=` |
+| Summary pre-generated in the background after `POST /v1/matches` when AI is enabled | `main.py` `warm_summary` |
+| `matches.summaries` JSON column | `db.py`, `migrations/versions/002_match_summaries.py` |
+| New 4-page janam patri milan PDF: cover with guna medallion and Ashtakoot table (with each person's varna/vashya/yoni/gana/nadi), birth details and Avakhada chakra, North Indian Lagna charts and planetary positions, koota-wise reading, strengths, considerations, guidance, method | `server/app/report.py`, `server/app/jyotish.py` |
+| Report list returns the couple's names and score | `main.py` `report_json` |
+| App: a single match opens a new summary page immediately; "Generate full report" at the end polls and opens the PDF; polling every 1–1.5 s and tolerant of brief network drops; failure codes explained (e.g. unknown birth time) | `mobile/lib/main.dart`, both ARB files |
+| Deploy script asks once (silently) for the OpenAI key | `infra/server-deploy.sh` |
+
+**Upstream rule note (for the domain reviewer):** vedic-calc gives Yoni 3/4 when both people have the same animal and
+the same gender; most published tables give 4/4. Not changed.

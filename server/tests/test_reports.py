@@ -26,8 +26,8 @@ def test_report_content_is_localised_escaped_and_complete(locale,title,koota,war
     html=report_html(match(),locale)
     assert title in html and koota in html and warning in html and 'new_unmapped_code' in html
     assert 'Asha &lt;b&gt;&amp;' in html and '<b>&' not in html
-    assert html.count('<tr><td>')>=8+2  # eight koota rows plus both birth-detail rows
-    assert '18.0 / 36' in html and 'v-test' in html and ('approximate time' in html or 'अनुमानित समय' in html)
+    assert html.count('<tr><td')>=8+6  # eight koota rows plus six birth-detail rows
+    assert '18 / 36' in html and 'v-test' in html and ('(approximate)' in html or '(अनुमानित)' in html)
 
 @pytest.mark.parametrize('locale',['en','hi'])
 def test_pdf_renders_with_embedded_fonts(locale):
@@ -36,6 +36,6 @@ def test_pdf_renders_with_embedded_fonts(locale):
     names=fonts(pdf)
     assert names and all('+' in n for n in names)  # subset-embedded, not referenced from the reader's system
     if locale=='hi':
-        if not shutil.which('fc-list') or 'Noto Sans Devanagari' not in subprocess.run(['fc-list'],capture_output=True,text=True).stdout:
+        if not shutil.which('fc-list') or 'Noto Serif Devanagari' not in subprocess.run(['fc-list'],capture_output=True,text=True).stdout:
             pytest.skip('Noto Sans Devanagari not installed on this machine')
-        assert any('NotoSansDevanagari' in n.replace('-','') for n in names)
+        assert any('Devanagari' in n for n in names)

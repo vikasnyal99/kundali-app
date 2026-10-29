@@ -6,7 +6,7 @@ Never point these at shared or production services.
 """
 import os
 # Hermetic: a developer's .env must not change test behaviour (environment variables override it).
-os.environ.update(DATABASE_URL='sqlite://',APP_ENV='test',ASTROLOGY_MODE='disabled',ASTROLOGY_URL='',S3_BUCKET='',S3_ENDPOINT_URL='')
+os.environ.update(DATABASE_URL='sqlite://',APP_ENV='test',ASTROLOGY_MODE='disabled',ASTROLOGY_URL='',S3_BUCKET='',S3_ENDPOINT_URL='',OPENAI_API_KEY='')
 from pathlib import Path
 from types import SimpleNamespace
 import pytest

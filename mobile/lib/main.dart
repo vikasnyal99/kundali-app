@@ -462,8 +462,20 @@ class _ShellState extends State<Shell> {
         Card(
           child: ListTile(
             leading: const Icon(Icons.description_outlined),
-            title: Text('PDF · ${r['locale']}'),
-            subtitle: Text(t(r['status'])),
+            title: Text(
+              r['people'] is List
+                  ? (r['people'] as List).join(' & ')
+                  : 'PDF',
+            ),
+            subtitle: Text(
+              [
+                if (r['score'] != null) '${points(r['score'])} / 36',
+                r['locale'] == 'hi' ? 'हिन्दी' : 'English',
+                r['status'] == 'failed'
+                    ? failureText(widget.t, r['failure_code'])
+                    : t(r['status']),
+              ].join(' · '),
+            ),
             trailing: IconButton(
               tooltip: t(r['status'] == 'ready' ? 'download' : 'refresh'),
               icon: Icon(
@@ -859,6 +871,7 @@ class _MatchFlowState extends State<MatchFlow> {
   Set<String> candidates = {};
   List<dynamic> results = [];
   bool busy = false, polling = false;
+  int pollFailures = 0;
   Timer? timer;
   String t(String k) => widget.t(k);
   @override
@@ -915,7 +928,13 @@ class _MatchFlowState extends State<MatchFlow> {
         resultId = d['id'];
         results = widget.compare ? d['results'] : [d];
       });
-      timer = Timer.periodic(const Duration(seconds: 3), (_) => poll());
+      // Local calculations come back ready; a single match opens its summary straight away.
+      if (!widget.compare && d['status'] == 'ready') {
+        open(d);
+      } else if (!settled) {
+        pollFailures = 0;
+        timer = Timer.periodic(const Duration(seconds: 1), (_) => poll());
+      }
     } catch (e) {
       if (mounted) {
         setState(() => error = describeError(e, t));
@@ -934,19 +953,39 @@ class _MatchFlowState extends State<MatchFlow> {
         widget.compare ? '/v1/comparisons/$resultId' : '/v1/matches/$resultId',
       );
       if (!mounted) return;
+      final wasRunning = timer?.isActive ?? false;
+      pollFailures = 0;
       setState(() => results = widget.compare ? d['results'] : [d]);
-      if (results.every(
-        (m) => m['status'] == 'ready' || m['status'] == 'failed',
-      )) {
+      if (settled) {
         timer?.cancel();
+        if (wasRunning && !widget.compare && d['status'] == 'ready') open(d);
       }
     } catch (_) {
-      timer?.cancel();
-      if (mounted) setState(() => error = t('error'));
+      // Tolerate brief network drops; give up after several in a row.
+      if (++pollFailures >= 5) {
+        timer?.cancel();
+        if (mounted) setState(() => error = t('error'));
+      }
     } finally {
       polling = false;
     }
   }
+
+  bool get settled => results.every(
+    (m) => m['status'] == 'ready' || m['status'] == 'failed',
+  );
+
+  void open(dynamic m) => Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => MatchDetail(
+        api: widget.api,
+        t: widget.t,
+        locale: widget.locale,
+        match: Map<String, dynamic>.from(m),
+      ),
+    ),
+  ).then((_) => poll());
 
   /// Equal scores are labelled rather than silently ranked apart.
   bool tied(dynamic m) => results.any(
@@ -1090,23 +1129,12 @@ class _MatchFlowState extends State<MatchFlow> {
                           ].join(' · ')
                         : m['failure_code'] == 'calculation_unavailable'
                         ? t('unavailable')
+                        : m['status'] == 'failed'
+                        ? failureText(widget.t, m['failure_code'])
                         : t(m['status']),
                   ),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () =>
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => MatchDetail(
-                            api: widget.api,
-                            t: widget.t,
-                            locale: widget.locale,
-                            match: Map<String, dynamic>.from(m),
-                          ),
-                        ),
-                      ).then((_) {
-                        poll();
-                      }),
+                  onTap: () => open(m),
                 ),
               ),
             if (results.any(
@@ -1127,6 +1155,24 @@ class _MatchFlowState extends State<MatchFlow> {
   );
 }
 
+/// Traditional band for a Guna score; the server uses the same thresholds.
+String scoreBand(num score) => score >= 33
+    ? 'excellent'
+    : score >= 25
+    ? 'good'
+    : score >= 18
+    ? 'average'
+    : 'low';
+
+/// Localised reason for a failed match or report, falling back to the generic status.
+String failureText(Translate t, String? code) {
+  if (code == null) return t('failed');
+  final text = t('err_$code');
+  return text == 'err_$code' ? '${t('failed')} ($code)' : text;
+}
+
+String points(num v) => v == v.roundToDouble() ? v.toInt().toString() : '$v';
+
 class MatchDetail extends StatefulWidget {
   final Api api;
   final Translate t;
@@ -1145,12 +1191,61 @@ class MatchDetail extends StatefulWidget {
 
 class _MatchDetailState extends State<MatchDetail> {
   late Map<String, dynamic> match;
-  String? error;
-  bool busy = false;
+  Map<String, dynamic>? summary, report;
+  String? error, summaryError, reportError;
+  bool busy = false, loadingSummary = false, reportBusy = false;
+  bool openWhenReady = false;
+  int reportFailures = 0;
+  Timer? reportTimer;
+  String t(String k) => widget.t(k);
+
   @override
   void initState() {
     super.initState();
     match = widget.match;
+    if (match['status'] == 'ready') load();
+  }
+
+  @override
+  void dispose() {
+    reportTimer?.cancel();
+    super.dispose();
+  }
+
+  /// Summary text (AI or template) plus any existing report for this match and language.
+  Future<void> load() async {
+    setState(() {
+      loadingSummary = true;
+      summaryError = null;
+    });
+    findReport();
+    try {
+      final s = await widget.api.request(
+        'GET',
+        '/v1/matches/${match['id']}/summary?locale=${widget.locale}',
+      );
+      if (mounted) setState(() => summary = Map<String, dynamic>.from(s));
+    } catch (e) {
+      if (mounted) setState(() => summaryError = describeError(e, widget.t));
+    } finally {
+      if (mounted) setState(() => loadingSummary = false);
+    }
+  }
+
+  /// An earlier report for this match and language turns the button into Download.
+  Future<void> findReport() async {
+    try {
+      final reports = await widget.api.request('GET', '/v1/reports');
+      final existing = (reports as List).where(
+        (r) => r['match_id'] == match['id'] && r['locale'] == widget.locale,
+      );
+      if (existing.isNotEmpty && mounted && report == null) {
+        setState(() => report = Map<String, dynamic>.from(existing.first));
+        watchReport();
+      }
+    } catch (_) {
+      // Optional: generating a report still works without this lookup.
+    }
   }
 
   Future<void> action(Future<void> Function() fn) async {
@@ -1167,17 +1262,390 @@ class _MatchDetailState extends State<MatchDetail> {
     }
   }
 
+  Future<void> generateReport() async {
+    setState(() {
+      reportBusy = true;
+      reportError = null;
+    });
+    try {
+      final r = await widget.api.request(
+        'POST',
+        '/v1/matches/${match['id']}/reports',
+        {'locale': widget.locale},
+      );
+      if (!mounted) return;
+      setState(() {
+        report = Map<String, dynamic>.from(r);
+        openWhenReady = true;
+      });
+      watchReport();
+    } catch (e) {
+      if (mounted) setState(() => reportError = describeError(e, widget.t));
+    } finally {
+      if (mounted) setState(() => reportBusy = false);
+    }
+  }
+
+  /// Polls a pending report; opens it once ready if the user just asked for it.
+  void watchReport() {
+    reportTimer?.cancel();
+    if (!['pending', 'processing'].contains(report?['status'])) return;
+    reportFailures = 0;
+    reportTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) async {
+      try {
+        final r = await widget.api.request(
+          'GET',
+          '/v1/reports/${report!['id']}',
+        );
+        if (!mounted) return;
+        setState(() => report = Map<String, dynamic>.from(r));
+        if (r['status'] == 'ready' || r['status'] == 'failed') {
+          reportTimer?.cancel();
+          if (r['status'] == 'ready' && openWhenReady) {
+            openWhenReady = false;
+            await download();
+          }
+        }
+      } catch (e) {
+        // Tolerate brief network drops; stop after repeated failures.
+        if (++reportFailures >= 5) {
+          reportTimer?.cancel();
+          if (mounted) setState(() => reportError = describeError(e, widget.t));
+        }
+      }
+    });
+  }
+
+  Future<void> download() async {
+    try {
+      final d = await widget.api.request(
+        'POST',
+        '/v1/reports/${report!['id']}/download-url',
+      );
+      if (!await launchUrl(
+        Uri.parse(d['url']),
+        mode: LaunchMode.externalApplication,
+      )) {
+        throw Exception();
+      }
+    } catch (e) {
+      if (mounted) setState(() => reportError = describeError(e, widget.t));
+    }
+  }
+
+  Widget section(String title, List<Widget> children) => Padding(
+    padding: const EdgeInsets.only(top: 22),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 10),
+        ...children,
+      ],
+    ),
+  );
+
+  Widget scoreCard(Map facts) {
+    final score = facts['score']['earned'] as num;
+    final primary = Theme.of(context).colorScheme.primary;
+    final doshas = [
+      for (final k in facts['score']['kootas'])
+        if (['nadi', 'bhakoot', 'gana'].contains(k['key']) && k['earned'] == 0)
+          k['key'] as String,
+    ];
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: primary,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        children: [
+          Text(t('score'), style: const TextStyle(color: Colors.white70)),
+          const SizedBox(height: 6),
+          Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: points(score),
+                  style: const TextStyle(fontSize: 52, height: 1),
+                ),
+                const TextSpan(
+                  text: ' / 36',
+                  style: TextStyle(fontSize: 22, color: Colors.white70),
+                ),
+              ],
+            ),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            t('band_${scoreBand(score)}'),
+            style: const TextStyle(
+              color: Color(0xfff6dfb6),
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: (score / 36).clamp(0, 1).toDouble(),
+              minHeight: 8,
+              backgroundColor: Colors.white24,
+              color: const Color(0xffd5b66d),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: [
+              for (final d in doshas)
+                Chip(
+                  label: Text(t('dosha_$d')),
+                  backgroundColor: const Color(0xfffde7e3),
+                  labelStyle: const TextStyle(color: Color(0xff9b2c1f)),
+                  side: BorderSide.none,
+                ),
+              if (doshas.isEmpty)
+                Chip(
+                  label: Text(t('noDosha')),
+                  backgroundColor: const Color(0xffe6f3e6),
+                  side: BorderSide.none,
+                ),
+              Chip(
+                label: Text(t('manglikShort')),
+                backgroundColor: Colors.white,
+                side: BorderSide.none,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget kootaRow(Map k) {
+    final earned = k['earned'] as num, possible = k['possible'] as num;
+    final colour = earned == possible
+        ? const Color(0xff2e6b34)
+        : earned == 0
+        ? const Color(0xff9b2c1f)
+        : const Color(0xff8a5a00);
+    final note = (k['note'] ?? '').toString();
+    final people = match['people'] as List;
+    return Card(
+      color: Colors.white,
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    t('koota_${k['key']}'),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colour.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${points(earned)} / ${points(possible)}',
+                    style: TextStyle(
+                      color: colour,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (k['area'] != null)
+              Text(
+                k['area'],
+                style: const TextStyle(color: Colors.black54, fontSize: 13),
+              ),
+            if (k['p1'] != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                '${people[0]['display_name']}: ${k['p1']}   ·   ${people[1]['display_name']}: ${k['p2']}',
+                style: const TextStyle(fontSize: 13),
+              ),
+            ],
+            if (note.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(note, style: const TextStyle(height: 1.45)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget bullets(List items, IconData icon, Color colour) => Column(
+    children: [
+      for (final s in items)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, size: 18, color: colour),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(s.toString(), style: const TextStyle(height: 1.4)),
+              ),
+            ],
+          ),
+        ),
+    ],
+  );
+
+  Widget summaryCard() {
+    if (loadingSummary && summary == null) {
+      return Card(
+        color: Colors.white,
+        elevation: 0,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2.5),
+              ),
+              const SizedBox(width: 16),
+              Expanded(child: Text(t('writingSummary'))),
+            ],
+          ),
+        ),
+      );
+    }
+    if (summary == null) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Text(summaryError ?? t('error')),
+              TextButton(onPressed: load, child: Text(t('retry'))),
+            ],
+          ),
+        ),
+      );
+    }
+    return Card(
+      color: Colors.white,
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              summary!['headline'],
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(summary!['overview'], style: const TextStyle(height: 1.55)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget reportSection() {
+    final status = report?['status'];
+    final working =
+        reportBusy || status == 'pending' || status == 'processing';
+    return Card(
+      color: Theme.of(context).colorScheme.primaryContainer,
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              t('fullReport'),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 6),
+            Text(t('fullReportBody')),
+            const SizedBox(height: 16),
+            if (working) ...[
+              const LinearProgressIndicator(),
+              const SizedBox(height: 10),
+              Text(t('preparingReport'), textAlign: TextAlign.center),
+            ] else if (status == 'ready')
+              FilledButton.icon(
+                icon: const Icon(Icons.download),
+                label: Text(t('download')),
+                onPressed: download,
+              )
+            else
+              FilledButton.icon(
+                icon: const Icon(Icons.picture_as_pdf_outlined),
+                label: Text(t(status == 'failed' ? 'retry' : 'generateReport')),
+                onPressed: generateReport,
+              ),
+            if (status == 'failed')
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Text(failureText(widget.t, report?['failure_code'])),
+              ),
+            if (reportError != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Text(
+                  reportError!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final t = widget.t;
     final facts = match['facts'];
+    final kootas = summary?['kootas'] ?? facts?['score']['kootas'] ?? [];
     return Scaffold(
       appBar: AppBar(title: Text(t('results'))),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 680),
           child: ListView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(20),
             children: [
               Text(
                 '${match['people'][0]['display_name']}  &  ${match['people'][1]['display_name']}',
@@ -1186,72 +1654,66 @@ class _MatchDetailState extends State<MatchDetail> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 18),
               if (busy) const LinearProgressIndicator(),
               if (error != null) Text(error!),
               if (facts != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(30),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(t('score')),
-                      Text(
-                        '${facts['score']['earned']} / 36',
-                        style: const TextStyle(
-                          fontSize: 48,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 18),
+                scoreCard(facts),
                 if ((facts['warnings'] as List).contains(
                   'independent_validation_pending',
                 ))
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(t('provisional')),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text(
+                      t('provisional'),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.black54,
+                      ),
                     ),
                   ),
-                Text(t('breakdown'), style: const TextStyle(fontSize: 22)),
-                const SizedBox(height: 12),
-                for (final k in facts['score']['kootas'])
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(k['key'].toString().replaceAll('_', ' ')),
-                    trailing: Text('${k['earned']} / ${k['possible']}'),
-                  ),
-                const Divider(),
-                Text(t('noManglik')),
-                const SizedBox(height: 20),
-                Text(t('disclaimer')),
-                const SizedBox(height: 24),
-                FilledButton.icon(
-                  icon: const Icon(Icons.picture_as_pdf_outlined),
-                  label: Text(t('createReport')),
-                  onPressed: busy
-                      ? null
-                      : () => action(() async {
-                          final messenger = ScaffoldMessenger.of(context);
-                          await widget.api.request(
-                            'POST',
-                            '/v1/matches/${match['id']}/reports',
-                            {'locale': widget.locale},
-                          );
-                          if (mounted) {
-                            messenger.showSnackBar(
-                              SnackBar(content: Text(t('pending'))),
-                            );
-                          }
-                        }),
+                section(t('summaryTitle'), [summaryCard()]),
+                section(t('breakdown'), [for (final k in kootas) kootaRow(k)]),
+                if ((summary?['strengths'] as List?)?.isNotEmpty ?? false)
+                  section(t('strengths'), [
+                    bullets(
+                      summary!['strengths'],
+                      Icons.check_circle_outline,
+                      const Color(0xff2e6b34),
+                    ),
+                  ]),
+                if ((summary?['considerations'] as List?)?.isNotEmpty ?? false)
+                  section(t('considerations'), [
+                    bullets(
+                      summary!['considerations'],
+                      Icons.info_outline,
+                      const Color(0xff8a5a00),
+                    ),
+                  ]),
+                if (summary != null)
+                  section(t('guidance'), [
+                    Text(summary!['guidance'], style: const TextStyle(height: 1.5)),
+                  ]),
+                const SizedBox(height: 16),
+                Text(
+                  t('noManglik'),
+                  style: const TextStyle(fontSize: 12, color: Colors.black54),
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  t('disclaimer'),
+                  style: const TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+                if (summary?['source'] == 'ai') ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    t('aiNote'),
+                    style: const TextStyle(fontSize: 12, color: Colors.black54),
+                  ),
+                ],
                 const SizedBox(height: 20),
+                reportSection(),
+                const SizedBox(height: 12),
                 ExpansionTile(
                   title: Text(t('method')),
                   children: [
@@ -1271,8 +1733,10 @@ class _MatchDetailState extends State<MatchDetail> {
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  match['failure_code'] == 'calculation_unavailable'
-                      ? t('unavailable')
+                  match['status'] == 'failed'
+                      ? (match['failure_code'] == 'calculation_unavailable'
+                            ? t('unavailable')
+                            : failureText(widget.t, match['failure_code']))
                       : t(match['status']),
                 ),
                 const SizedBox(height: 20),
@@ -1294,6 +1758,7 @@ class _MatchDetailState extends State<MatchDetail> {
                             setState(
                               () => match = Map<String, dynamic>.from(d),
                             );
+                            if (match['status'] == 'ready') load();
                           }
                         }),
                   child: Text(

@@ -168,7 +168,7 @@ def test_person_deleted_while_report_uploads_schedules_object_cleanup(database,c
     h=token(client); a,b=person(client,h,'Fixed')['id'],person(client,h,'Bela')['id']
     m=client.post('/v1/matches',headers=h,json={'person1_id':a,'person2_id':b}).json(); drain()
     deleted=[]
-    def upload_then_race(report,match):
+    def upload_then_race(report,match,summary=None):
         assert client.delete(f'/v1/people/{a}',headers=h).status_code==204
         return f'reports/{report.owner_id}/{match.id}/{report.id}.pdf','checksum'
     monkeypatch.setattr(worker,'store_report',upload_then_race)

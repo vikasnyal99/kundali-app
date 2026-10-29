@@ -4,7 +4,7 @@ from datetime import timedelta
 from collections import defaultdict, deque
 from time import monotonic
 import jwt
-from fastapi import FastAPI, Depends, HTTPException, Request, Query
+from fastapi import FastAPI, Depends, HTTPException, Request, Query, BackgroundTasks
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -13,9 +13,10 @@ from sqlalchemy import select, delete, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DBSession
 from .config import settings
-from .db import User, Person, Match, Comparison, Report, Job, session, now
+from .db import User, Person, Match, Comparison, Report, Job, Session, session, now
 from .schemas import PersonInput, MatchInput, ComparisonInput, LocaleInput
 from .places import search as search_places
+from . import summary as summaries
 
 app = FastAPI(title='KundliMilan AI', version='0.1.0')
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins.split(','), allow_methods=['GET','POST','PATCH','DELETE'], allow_headers=['Authorization','Content-Type'])
@@ -51,7 +52,23 @@ def owned(db, cls, id, owner):
     return obj
 def person_json(p): return {'id':p.id,'revision':p.revision,**p.data}
 def match_json(m): return {'id':m.id,'status':m.status,'failure_code':m.failure_code,'people':m.snapshot['people'],'calculation':m.snapshot['settings'],'facts':m.facts}
+def warm_summary(match_id,locale):
+    """Background pre-generation so the summary page usually opens from cache."""
+    with Session() as db:
+        m=db.get(Match,match_id)
+        if m and m.status=='ready': summaries.ensure(db,m,locale)
 def enqueue(db,kind,id,payload=None): db.add(Job(kind=kind,target_id=id,payload=payload or {}))
+def compute(db,m):
+    """The local engine takes about a millisecond, so compute in the request instead of waiting for the
+    worker; external providers (network calls) still go through the job queue."""
+    if settings.astrology_mode!='local_experimental': return enqueue(db,'match',m.id)
+    from .services import calculate, PermanentFailure
+    try:
+        m.facts=calculate(m.snapshot); m.status='ready'; m.failure_code=None
+    except PermanentFailure as exc:
+        m.status='failed'; m.failure_code=str(exc)
+    except Exception:
+        enqueue(db,'match',m.id)  # unexpected error: let the worker retry with backoff
 def create_match(db,owner,p1,p2):
     if p1 == p2: raise HTTPException(422,'same_person')
     people = [owned(db,Person,p,owner) for p in (p1,p2)]
@@ -63,7 +80,7 @@ def create_match(db,owner,p1,p2):
     existing = db.scalar(select(Match).where(Match.cache_key == key))
     if existing: return existing
     m = Match(owner_id=owner,cache_key=key,snapshot=snapshot)
-    db.add(m); db.flush(); enqueue(db,'match',m.id)
+    db.add(m); db.flush(); compute(db,m)
     return m
 @app.get('/health/live')
 def live(): return {'status':'ok'}
@@ -110,11 +127,14 @@ def edit_person(id:str,body:PersonInput,u=Depends(user),db:DBSession=Depends(ses
 def remove_person(id:str,u=Depends(user),db:DBSession=Depends(session)):
     p=owned(db,Person,id,u.id); invalidate(db,u.id,id); db.delete(p); db.commit()
 @app.post('/v1/matches',status_code=202)
-def add_match(body:MatchInput,u=Depends(user),db:DBSession=Depends(session)):
+def add_match(body:MatchInput,background:BackgroundTasks,u=Depends(user),db:DBSession=Depends(session)):
     try:
-        m=create_match(db,u.id,body.person1_id,body.person2_id); db.commit(); return match_json(m)
+        m=create_match(db,u.id,body.person1_id,body.person2_id); db.commit()
     except IntegrityError:
-        db.rollback(); m=create_match(db,u.id,body.person1_id,body.person2_id); db.commit(); return match_json(m)
+        db.rollback(); m=create_match(db,u.id,body.person1_id,body.person2_id); db.commit()
+    if m.status=='ready' and summaries.ai_enabled() and not summaries.fresh((m.summaries or {}).get(body.locale)):
+        background.add_task(warm_summary,m.id,body.locale)
+    return match_json(m)
 @app.get('/v1/matches')
 def matches(u=Depends(user),db:DBSession=Depends(session)):
     return [match_json(m) for m in db.scalars(select(Match).where(Match.owner_id==u.id))]
@@ -124,8 +144,13 @@ def get_match(id:str,u=Depends(user),db:DBSession=Depends(session)): return matc
 def retry_match(id:str,u=Depends(user),db:DBSession=Depends(session)):
     m=owned(db,Match,id,u.id)
     if m.status=='failed':
-        m.status='pending'; m.failure_code=None; enqueue(db,'match',id); db.commit()
+        m.status='pending'; m.failure_code=None; compute(db,m); db.commit()
     return match_json(m)
+@app.get('/v1/matches/{id}/summary')
+def match_summary(id:str,locale:str=Query('en',pattern='^(en|hi)$'),u=Depends(user),db:DBSession=Depends(session)):
+    m=owned(db,Match,id,u.id)
+    if m.status!='ready': raise HTTPException(409,'match_not_ready')
+    return summaries.ensure(db,m,locale)
 @app.post('/v1/comparisons',status_code=202)
 def compare(body:ComparisonInput,u=Depends(user),db:DBSession=Depends(session)):
     def build():
@@ -141,10 +166,14 @@ def comparison(id:str,u=Depends(user),db:DBSession=Depends(session)):
     # Ready results first by score; ties and unscored rows keep a deterministic name/id order.
     ms.sort(key=lambda m:(-(m.facts['score']['earned'] if m.status=='ready' else -1),m.snapshot['people'][1]['display_name'].casefold(),m.snapshot['people'][1]['id']))
     return {'id':c.id,'person1_id':c.person1_id,'results':[match_json(m) for m in ms]}
-def report_json(r): return {'id':r.id,'match_id':r.match_id,'status':r.status,'locale':r.locale,'failure_code':r.failure_code}
+def report_json(r,m=None):
+    out={'id':r.id,'match_id':r.match_id,'status':r.status,'locale':r.locale,'failure_code':r.failure_code}
+    if m: out['people']=[p['display_name'] for p in m.snapshot['people']]; out['score']=m.facts['score']['earned'] if m.facts else None
+    return out
 @app.get('/v1/reports')
 def reports(u=Depends(user),db:DBSession=Depends(session)):
-    return [report_json(r) for r in db.scalars(select(Report).where(Report.owner_id==u.id))]
+    rows=db.execute(select(Report,Match).join(Match,Match.id==Report.match_id).where(Report.owner_id==u.id))
+    return [report_json(r,m) for r,m in rows]
 @app.post('/v1/matches/{id}/reports',status_code=202)
 def make_report(id:str,body:LocaleInput,u=Depends(user),db:DBSession=Depends(session)):
     m=owned(db,Match,id,u.id)

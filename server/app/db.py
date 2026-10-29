@@ -27,6 +27,8 @@ class Match(Base):
     status: Mapped[str] = mapped_column(default='pending')
     facts: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     failure_code: Mapped[str | None] = mapped_column(nullable=True)
+    # Explanation text per locale (summary.py); never a source of scores.
+    summaries: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 class Comparison(Base):
     __tablename__ = 'comparisons'
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)

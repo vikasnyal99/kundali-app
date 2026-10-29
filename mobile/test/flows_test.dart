@@ -43,6 +43,13 @@ class FakeBackend {
     person('d', 'Dev'),
   ];
   final requests = <http.Request>[];
+  int reportPolls = 0;
+  Map<String, dynamic> report(String status) => {
+    'id': 'r1',
+    'match_id': 'm-b',
+    'locale': 'en',
+    'status': status,
+  };
   final overrides = <String, http.Response>{};
   late final client = MockClient((r) async {
     requests.add(r);
@@ -71,6 +78,38 @@ class FakeBackend {
         return json([]);
       case 'POST /v1/comparisons':
         return json(comparison(body['person1_id'], body['person2_ids']));
+      case 'POST /v1/matches':
+        return json(
+          comparison(body['person1_id'], [body['person2_id']])['results'][0],
+          202,
+        );
+      case 'GET /v1/matches/m-b/summary':
+        return json({
+          'source': 'ai',
+          'headline': 'Good match (Uttam)',
+          'overview': 'Asha and Bharat share 24 of 36 gunas.',
+          'kootas': [
+            {
+              'key': 'nadi',
+              'earned': 8,
+              'possible': 8,
+              'area': 'Health and progeny',
+              'p1': 'Aadi',
+              'p2': 'Antya',
+              'note': 'Different nadis are favourable.',
+            },
+          ],
+          'strengths': ['Nadi is fully matched'],
+          'considerations': [],
+          'guidance': 'Talk openly.',
+        });
+      case 'POST /v1/matches/m-b/reports':
+        return json(report('pending'), 202);
+      case 'GET /v1/reports/r1':
+        reportPolls++;
+        return json(report(reportPolls > 1 ? 'ready' : 'processing'));
+      case 'POST /v1/reports/r1/download-url':
+        return json({'url': 'https://example.test/r1.pdf'});
     }
     return json({
       'error': {'code': 'not_found', 'message': 'not_found'},
@@ -206,6 +245,39 @@ void main() {
       });
       // Let the poll timer observe the finished results and stop.
       await tester.pump(const Duration(seconds: 4));
+    },
+  );
+
+  testWidgets(
+    'a match opens its summary at once and the full report is generated from there',
+    (tester) async {
+      final backend = await launch(tester);
+      await tester.tap(find.text('Match Kundlis'));
+      await tester.pumpAndSettle();
+      await choose(tester, 'Person 1 · stays fixed', 'Asha');
+      await choose(tester, 'Person 2', 'Bharat');
+      await tester.tap(find.text('Generate match'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Asha  &  Bharat'), findsOneWidget);
+      expect(find.text('Good match (Uttam)'), findsWidgets);
+      expect(find.text('Asha and Bharat share 24 of 36 gunas.'), findsOneWidget);
+      expect(find.text('Different nadis are favourable.'), findsOneWidget);
+      expect(find.text('Asha: Aadi   ·   Bharat: Antya'), findsOneWidget);
+
+      await tester.scrollUntilVisible(find.text('Generate full report'), 300);
+      await tester.tap(find.text('Generate full report'));
+      await tester.pump();
+      await tester.pump();
+      expect(find.textContaining('Preparing your PDF'), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 1600));
+      await tester.pump(const Duration(milliseconds: 1600));
+      await tester.pumpAndSettle();
+      expect(
+        backend.requests.map((r) => '${r.method} ${r.url.path}'),
+        contains('POST /v1/reports/r1/download-url'),
+      );
+      expect(find.text('Download PDF'), findsOneWidget);
     },
   );
 

@@ -16,7 +16,8 @@ class Settings(BaseSettings):
     astrology_api_key: str = ''
     astrology_engine_version: str = 'unconfigured'
     cors_origins: str = 'http://localhost:8080'
-    worker_poll_seconds: int = 3
+    # The worker only renders PDFs and runs provider calculations; local matches are computed inline.
+    worker_poll_seconds: float = 1
     job_max_attempts: int = 3
     job_lease_minutes: int = 10
     job_retention_days: int = 14
@@ -25,7 +26,9 @@ class Settings(BaseSettings):
     # Optional AI provider for explanation text only; scores always come from the deterministic engine.
     # Set the key in .env on the server, never in code (the repository is public).
     openai_api_key: str = ''
-    openai_model: str = ''
+    openai_model: str = 'gpt-4.1-mini'
+    openai_base_url: str = 'https://api.openai.com/v1'
+    openai_timeout_seconds: float = 25
     def check(self):
         if self.app_env == 'production':
             if self.astrology_mode == 'local_experimental' and not self.astrology_release_approved:
