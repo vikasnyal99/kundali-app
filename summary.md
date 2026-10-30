@@ -559,3 +559,14 @@ infra/server-deploy.sh` → exit 0, `kundli-api` healthy, worker restarted, Cadd
 checks: artwork, `FontManifest.json` (all four families) and icons served; home renders in Chrome; a person saved with
 `avatar: female_3` keeps it (throwaway guest erased); full `api_smoke.sh` passed. A cold load from the laptop took about 14 s
 until the home images finished (`main.dart.js` alone 6 s).
+
+## 18. Simpler Select Person pages (2026-10-31)
+
+**Source:** `~/Downloads/kundali_match.png`. `PickPersonPage` (`people.dart`) no longer has the Saved / Add New switch: a Step chip,
+groom or bride crest with "(Usually the Groom/Bride)", a one-line explanation, one "Add New Person" panel (`ActionPanel`), then
+saved people with search and radio, and the bottom action. Person 1 is green, Person 2 gold (`PersonSide`). Compare's Person 1 uses
+the same page without the Step chip and with the reference's "keep this person fixed" wording, which is only true there. Match's
+Person 1 keeps a groom-side explanation instead. The person form keeps its steps; its portraits now sit on one scrolling line.
+
+**Artwork:** `km_crests.png`, `km_ornaments.png` in `~/Downloads/KundliMilan_HD_Art/` (crests, green and gold leaves, line mandala),
+processed by `prepare_assets.py`; 27 images, 2.21 MB.

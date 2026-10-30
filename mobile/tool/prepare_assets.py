@@ -5,7 +5,7 @@
   v/bin/python -I mobile/tool/prepare_assets.py ~/Downloads/KundliMilan_HD_Art
 
 Source files (ChatGPT, text-free): km_splash_bg, km_home_hero, km_night, km_mandala, km_avatars (3x2),
-km_illustrations (3x2), km_states (3x2). Wordmarks and buttons are live text and widgets, never artwork.
+km_illustrations (3x2), km_states (3x2), km_crests (2x1), km_ornaments (3x1). Wordmarks and buttons are live text and widgets, never artwork.
 """
 import sys
 from pathlib import Path
@@ -46,7 +46,7 @@ def alpha_cut(img, thr=236):
     return Image.fromarray(out, 'RGBA'), bg
 
 
-def split_sheet(img, names, longest):
+def split_sheet(img, names, longest, rows=2, cols=3):
     """Assigns each foreground blob to the grid cell holding its centre, then crops each cell's union."""
     cut, bg = alpha_cut(img)
     arr = np.asarray(cut)
@@ -59,8 +59,8 @@ def split_sheet(img, names, longest):
         if size < 12:
             continue
         cy, cx = (box[0].start + box[0].stop) / 2, (box[1].start + box[1].stop) / 2
-        cells.setdefault((int(cy * 2 / h), int(cx * 3 / w)), []).append(i)
-    for (r, c), name in zip([(r, c) for r in range(2) for c in range(3)], names):
+        cells.setdefault((int(cy * rows / h), int(cx * cols / w)), []).append(i)
+    for (r, c), name in zip([(r, c) for r in range(rows) for c in range(cols)], names):
         ids = cells.get((r, c), [])
         mask = np.isin(labels, ids)
         ys, xs = np.where(mask)
@@ -89,6 +89,15 @@ split_sheet(
     ['state_no_people', 'state_no_reports', 'state_no_data', 'state_processing', 'state_report_ready', 'state_success'],
     640,
 )
+
+split_sheet(Image.open(SRC / 'km_crests.png'), ['crest_groom', 'crest_bride'], 620, rows=1, cols=2)
+split_sheet(Image.open(SRC / 'km_ornaments.png'), ['leaves_green', 'leaves_gold'], 520, rows=1, cols=3)
+# Line art: white is transparent everywhere, including inside the petals.
+ornaments = Image.open(SRC / 'km_ornaments.png').convert('RGB')
+line = np.asarray(ornaments.crop((2 * ornaments.width // 3, 0, ornaments.width, ornaments.height)), dtype=np.float32)
+ink = np.clip((255 - line.min(axis=2)) / 150, 0, 1)
+lit = np.dstack([np.full(ink.shape, v) for v in (178, 132, 54)] + [ink * 255]).astype(np.uint8)
+webp(fit(Image.fromarray(lit, 'RGBA').crop(Image.fromarray(lit[..., 3]).getbbox()), 520), 'mandala_line', 85)
 
 # Portraits: a tighter square around each centred face, for circular avatars.
 sheet = Image.open(SRC / 'km_avatars.png').convert('RGB')

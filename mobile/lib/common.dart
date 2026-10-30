@@ -109,6 +109,7 @@ class PersonRow extends StatelessWidget {
   final Widget? trailing;
   final VoidCallback? onTap;
   final bool selected, withTime;
+  final Color accent;
   const PersonRow({
     super.key,
     required this.person,
@@ -118,14 +119,19 @@ class PersonRow extends StatelessWidget {
     this.onTap,
     this.selected = false,
     this.withTime = false,
+    this.accent = Palette.gold,
   });
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 10),
     child: AppCard(
       onTap: onTap,
-      color: selected ? Palette.goldSoft : Palette.surface,
-      borderColor: selected ? Palette.gold : Palette.border,
+      color: !selected
+          ? Palette.surface
+          : accent == Palette.green
+          ? Palette.greenSoft
+          : Palette.goldSoft,
+      borderColor: selected ? accent : Palette.border,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(
         children: [

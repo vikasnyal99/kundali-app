@@ -58,7 +58,7 @@ class _CompareFlowState extends State<CompareFlow> {
           locale: widget.locale,
           title: t('choosePerson1'),
           action: t('next'),
-          hint: t('person1Hint'),
+          side: PersonSide.compareFirst,
           selected: fixed?['id'],
         ),
       ),

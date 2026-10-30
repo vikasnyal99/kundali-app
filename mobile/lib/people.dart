@@ -246,37 +246,42 @@ class _PersonEditorState extends State<PersonEditor> {
   );
 
   /// Initials (default) or one of the portraits; the chosen one lifts and gets an emerald ring.
-  Widget avatarPicker() => Wrap(
-    spacing: 8,
-    runSpacing: 8,
-    children: [
-      for (final choice in [null, ...avatarChoices])
-        GestureDetector(
-          key: ValueKey('avatar-${choice ?? 'initials'}'),
-          onTap: () => setState(() => avatar = choice),
-          child: AnimatedScale(
-            scale: avatar == choice ? 1.08 : 1,
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutBack,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: avatar == choice ? Palette.green : Colors.transparent,
-                  width: 2.4,
+  Widget avatarPicker() => SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    clipBehavior: Clip.none,
+    child: Row(
+      spacing: 6,
+      children: [
+        for (final choice in [null, ...avatarChoices])
+          GestureDetector(
+            key: ValueKey('avatar-${choice ?? 'initials'}'),
+            onTap: () => setState(() => avatar = choice),
+            child: AnimatedScale(
+              scale: avatar == choice ? 1.08 : 1,
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutBack,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: avatar == choice
+                        ? Palette.green
+                        : Colors.transparent,
+                    width: 2.4,
+                  ),
                 ),
-              ),
-              child: Avatar(
-                name.text.trim().isEmpty ? '?' : name.text.trim(),
-                image: choice,
-                size: 56,
+                child: Avatar(
+                  name.text.trim().isEmpty ? '?' : name.text.trim(),
+                  image: choice,
+                  size: 56,
+                ),
               ),
             ),
           ),
-        ),
-    ],
+      ],
+    ),
   );
 
   Widget details() => Form(
@@ -497,15 +502,20 @@ class _PersonEditorState extends State<PersonEditor> {
   );
 }
 
-/// "Select Person" list from the design: Saved People / Add New tabs, search, radio selection and a
-/// bottom action. Returns the chosen person (or runs [onConfirm] and stays open while it works).
+/// Which person a [PickPersonPage] is choosing, which sets its crest, wording and colour.
+enum PersonSide { first, second, compareFirst }
+
+/// "Select Person": a step chip and crest, one clear Add New Person action, then saved people with
+/// search and a radio choice, and the bottom action. Returns the chosen person (or runs [onConfirm]
+/// and stays open while it works).
 class PickPersonPage extends StatefulWidget {
   final Api api;
   final Translate t;
   final String locale;
   final String title;
   final String action;
-  final String? hint, selected, exclude;
+  final PersonSide side;
+  final String? selected, exclude;
   final Future<void> Function(Map person)? onConfirm;
   const PickPersonPage({
     super.key,
@@ -514,7 +524,7 @@ class PickPersonPage extends StatefulWidget {
     required this.locale,
     required this.title,
     required this.action,
-    this.hint,
+    this.side = PersonSide.first,
     this.selected,
     this.exclude,
     this.onConfirm,
@@ -529,6 +539,7 @@ class _PickPersonPageState extends State<PickPersonPage> {
   String search = '';
   bool loading = true, busy = false;
   String t(String k) => widget.t(k);
+  bool get gold => widget.side == PersonSide.second;
 
   @override
   void initState() {
@@ -576,6 +587,67 @@ class _PickPersonPageState extends State<PickPersonPage> {
     }
   }
 
+  Widget stepChip() => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+    decoration: BoxDecoration(
+      color: gold ? Palette.goldSoft : Palette.greenSoft,
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Text(
+      t('stepOf').replaceAll('{n}', gold ? '2' : '1'),
+      style: const TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+        color: Palette.ink,
+      ),
+    ),
+  );
+
+  Widget header() => Row(
+    children: [
+      Art(gold ? 'crest_bride' : 'crest_groom', width: 112, height: 112),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Column(
+          children: [
+            Text(
+              widget.title,
+              textAlign: TextAlign.center,
+              style: heading(25, color: Palette.greenDeep),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              t(gold ? 'usuallyBride' : 'usuallyGroom'),
+              textAlign: TextAlign.center,
+              style: heading(15, color: Palette.greenDark),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+
+  Widget info() => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    decoration: BoxDecoration(
+      color: gold ? const Color(0xfffbf1dc) : const Color(0xffe9f0e2),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: gold ? const Color(0xfff0dfb8) : const Color(0xffd6e2cb),
+      ),
+    ),
+    child: Text(
+      t(switch (widget.side) {
+        PersonSide.first => 'person1Info',
+        PersonSide.second => 'person2Info',
+        PersonSide.compareFirst => 'compareInfo',
+      }),
+      textAlign: TextAlign.center,
+      style: const TextStyle(fontSize: 13.5, height: 1.4, color: Palette.ink),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final q = search.toLowerCase();
@@ -588,61 +660,97 @@ class _PickPersonPageState extends State<PickPersonPage> {
         )
         .toList();
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        title: widget.side == PersonSide.compareFirst ? null : stepChip(),
+        leading: Center(
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.white, Color(0xffefe6d3)],
+              ),
+              border: Border.all(color: const Color(0xffe2d2ad)),
+              boxShadow: [
+                const BoxShadow(color: Color(0xffcdb98e), offset: Offset(0, 2)),
+                BoxShadow(
+                  color: Palette.shadow.withValues(alpha: 0.2),
+                  offset: const Offset(0, 5),
+                  blurRadius: 9,
+                ),
+              ],
+            ),
+            child: const BackButton(),
+          ),
+        ),
+      ),
+      extendBodyBehindAppBar: true,
+      body: Stack(
+        children: [
+          Positioned.fill(child: PickerBackground(gold: gold)),
+          SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
                 child: Column(
                   children: [
-                    SizedBox(
-                      width: double.infinity,
-                      child: PillSwitch<int>(
-                        options: [
-                          (0, t('savedPeopleTab')),
-                          (1, t('addNewTab')),
-                        ],
-                        value: 0,
-                        onChanged: (v) {
-                          if (v == 1) addNew();
-                        },
-                      ),
-                    ),
-                    if (widget.hint != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 10),
-                        child: Text(
-                          widget.hint!,
-                          style: const TextStyle(
-                            fontSize: 12.5,
-                            color: Palette.muted,
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 12),
-                    SearchBox(
-                      hint: t('searchHint'),
-                      onChanged: (v) => setState(() => search = v),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: loading
-                    ? const Center(child: CircularProgressIndicator())
-                    : ListView(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                    Expanded(
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(20, 2, 20, 12),
                         children: [
-                          if (shown.isEmpty)
+                          Reveal(child: header()),
+                          const SizedBox(height: 10),
+                          Reveal(delay: 80, child: info()),
+                          const SizedBox(height: 14),
+                          Reveal(
+                            delay: 140,
+                            child: ActionPanel(
+                              icon: Icons.person_add_alt_1,
+                              title: t('addNewPerson'),
+                              body: t('addNewPersonBody'),
+                              gold: gold,
+                              onTap: addNew,
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.people,
+                                color: Palette.greenDark,
+                                size: 24,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  t('chooseSaved'),
+                                  style: heading(16.5),
+                                ),
+                              ),
+                              const Art('lotus', width: 30, height: 26),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          SearchBox(
+                            hint: t('searchHint'),
+                            onChanged: (v) => setState(() => search = v),
+                          ),
+                          const SizedBox(height: 12),
+                          if (loading)
+                            const Padding(
+                              padding: EdgeInsets.all(20),
+                              child: Center(child: CircularProgressIndicator()),
+                            )
+                          else if (shown.isEmpty)
                             Padding(
-                              padding: const EdgeInsets.all(16),
+                              padding: const EdgeInsets.all(12),
                               child: Column(
                                 children: [
-                                  const Art('state_no_people', height: 160),
+                                  const Art('state_no_people', height: 130),
                                   const SizedBox(height: 8),
                                   Text(
                                     t('noPeopleYet'),
@@ -654,52 +762,63 @@ class _PickPersonPageState extends State<PickPersonPage> {
                                 ],
                               ),
                             ),
-                          for (final p in shown)
-                            PersonRow(
-                              person: p,
-                              t: widget.t,
-                              locale: widget.locale,
-                              selected: p['id'] == chosen,
-                              onTap: () => setState(() => chosen = p['id']),
-                              trailing: SelectDot(selected: p['id'] == chosen),
+                          for (final (i, p) in shown.indexed)
+                            Reveal(
+                              key: ValueKey('pick-${p['id']}'),
+                              delay: 40 * i.clamp(0, 6),
+                              child: PersonRow(
+                                person: p,
+                                t: widget.t,
+                                locale: widget.locale,
+                                selected: p['id'] == chosen,
+                                accent: gold ? Palette.gold : Palette.green,
+                                onTap: () => setState(() => chosen = p['id']),
+                                trailing: SelectDot(
+                                  selected: p['id'] == chosen,
+                                ),
+                              ),
                             ),
                         ],
                       ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-                child: Column(
-                  children: [
-                    if (error != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Text(
-                          error!,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(36, 8, 36, 20),
+                      child: Column(
+                        children: [
+                          if (error != null)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Text(
+                                error!,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
+                              ),
+                            ),
+                          if (busy)
+                            const Padding(
+                              padding: EdgeInsets.only(bottom: 8),
+                              child: LinearProgressIndicator(),
+                            ),
+                          PrimaryButton(
+                            widget.action,
+                            gold: gold,
+                            onPressed:
+                                busy ||
+                                    chosen == null ||
+                                    !shown.any((p) => p['id'] == chosen)
+                                ? null
+                                : confirm,
                           ),
-                        ),
+                        ],
                       ),
-                    if (busy)
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 8),
-                        child: LinearProgressIndicator(),
-                      ),
-                    PrimaryButton(
-                      widget.action,
-                      onPressed:
-                          busy ||
-                              chosen == null ||
-                              !shown.any((p) => p['id'] == chosen)
-                          ? null
-                          : confirm,
                     ),
                   ],
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

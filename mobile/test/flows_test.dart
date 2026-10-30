@@ -392,6 +392,27 @@ void main() {
     },
   );
 
+  testWidgets('Add New Person opens the form from either Select Person step', (
+    tester,
+  ) async {
+    await launch(tester);
+    await tester.tap(find.text('Match Kundlis'));
+    await tester.pumpAndSettle();
+    expect(find.text('Step 1 of 2'), findsOneWidget);
+    expect(find.text('(Usually the Groom)'), findsOneWidget);
+    await tester.tap(find.text('Add New Person'));
+    await tester.pumpAndSettle();
+    expect(find.text('Basic Information'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await pick(tester, 'Asha', 'Next');
+    expect(find.text('Step 2 of 2'), findsOneWidget);
+    expect(find.text('(Usually the Bride)'), findsOneWidget);
+    await tester.tap(find.text('Add New Person'));
+    await tester.pumpAndSettle();
+    expect(find.text('Basic Information'), findsOneWidget);
+  });
+
   Future<void> openEditor(WidgetTester tester) async {
     await tester.tap(find.text('People').last);
     await tester.pumpAndSettle();

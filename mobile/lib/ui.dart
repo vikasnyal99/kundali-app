@@ -478,6 +478,85 @@ class _PrimaryButtonState extends State<PrimaryButton> {
   }
 }
 
+/// The wide "Add New Person" action: a raised emerald or gold panel with an icon, title and line.
+class ActionPanel extends StatelessWidget {
+  final IconData icon;
+  final String title, body;
+  final bool gold;
+  final VoidCallback onTap;
+  const ActionPanel({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.body,
+    required this.onTap,
+    this.gold = false,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final titleColour = gold ? const Color(0xff4a3208) : Colors.white;
+    final bodyColour = gold ? const Color(0xff6b5320) : const Color(0xffdfe9dc);
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: gold
+              ? const [Color(0xfffff3d4), Color(0xfff6dfae), Color(0xffecca85)]
+              : const [Color(0xff3a7d57), Color(0xff1f5338), Color(0xff133c27)],
+        ),
+        border: Border.all(color: const Color(0xffcfa24f), width: 1.4),
+        boxShadow: [
+          BoxShadow(
+            color: gold ? const Color(0xffb08a42) : const Color(0xff0c2b1b),
+            offset: const Offset(0, 2.6),
+          ),
+          BoxShadow(
+            color: (gold ? const Color(0xff8a6420) : const Color(0xff174a30))
+                .withValues(alpha: 0.3),
+            offset: const Offset(0, 9),
+            blurRadius: 16,
+            spreadRadius: -2,
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: onTap,
+          splashColor: Colors.white.withValues(alpha: 0.12),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+            child: Row(
+              children: [
+                Medallion(icon, size: 46),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: heading(18, color: titleColour)),
+                      const SizedBox(height: 3),
+                      Text(
+                        body,
+                        style: TextStyle(fontSize: 12.5, color: bodyColour),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: titleColour),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Compact raised pill for inline actions such as Edit.
 class SmallButton extends StatefulWidget {
   final String label;
@@ -1496,6 +1575,59 @@ class PaperBackground extends StatelessWidget {
       ],
     ),
   );
+}
+
+/// Paper with a line mandala in the top corner and leaves in the bottom corners (green or gold).
+class PickerBackground extends StatelessWidget {
+  final bool gold;
+  const PickerBackground({super.key, this.gold = false});
+  @override
+  Widget build(BuildContext context) {
+    final leaves = gold ? 'leaves_gold' : 'leaves_green';
+    return IgnorePointer(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xfffcf8f0), Palette.background],
+              ),
+            ),
+          ),
+          const Positioned(
+            right: -46,
+            top: -30,
+            child: Opacity(
+              opacity: 0.55,
+              child: Art('mandala_line', width: 170, height: 170),
+            ),
+          ),
+          Positioned(
+            left: -14,
+            bottom: -8,
+            child: Opacity(
+              opacity: 0.8,
+              child: Art(leaves, width: 118, height: 118),
+            ),
+          ),
+          Positioned(
+            right: -14,
+            bottom: -8,
+            child: Opacity(
+              opacity: 0.8,
+              child: Transform.flip(
+                flipX: true,
+                child: Art(leaves, width: 118, height: 118),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// The opening scene shared by the language screen and the native splash: painted background, a slowly

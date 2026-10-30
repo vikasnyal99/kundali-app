@@ -303,7 +303,6 @@ class _ShellState extends State<Shell> {
             locale: widget.locale,
             title: t('selectPerson1'),
             action: t('next'),
-            hint: t('person1Hint'),
             selected: first?['id'],
           ),
         ),
@@ -319,6 +318,7 @@ class _ShellState extends State<Shell> {
             locale: widget.locale,
             title: t('selectPerson2'),
             action: t('match'),
+            side: PersonSide.second,
             exclude: person1['id'],
             onConfirm: (second) async {
               final m = await widget.api.request('POST', '/v1/matches', {
