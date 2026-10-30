@@ -3,7 +3,7 @@
 **Updated:** 2026-10-29 (fourth session: instant matches, OpenAI summaries, new PDF; see §11)  
 **Workspace:** `/home/vikas/Desktop/kundali-app`  
 **Live** at `https://kundaliapi.zivantaai.com` (since 2026-10-30; `http://65.1.226.15` kept for old debug builds) on EC2
-`pulse-start`. Since §14 the app's screens are a web app served at that address; the APK is a native splash + WebView.
+`pulse-start`, server at `341243c`. Since §14 the app's screens are a web app served at that address; the APK is a native splash + WebView.
 See §10–§14.
 
 ## 1. Product and sources of truth
@@ -512,3 +512,9 @@ analyze` clean, `flutter test` 14 passed (form sends `avatar`; language screen a
 artwork). Seen in Chrome against a local server: language screen (English) and home banner. Chrome screenshots
 then kept timing out on the image-heavy screens, so the remaining screens were not seen in the browser.
 APKs: `app-arm64-v8a-release.apk` 17.7 MB, `app-release.apk` 47.4 MB (needed once for the splash art and icon).
+
+**Deployed 2026-10-30 (`341243c`)** by Claude through the AWS console's SSM Session Manager in Chrome (the owner was
+logged in): `git pull`, `SITE=kundaliapi.zivantaai.com bash infra/server-deploy.sh` → exit 0, `kundli-api` healthy,
+worker restarted, Caddy route active; session closed with `exit`. Live checks: artwork (`splash_en.jpg`,
+`home_banner.jpg`, `avatar_male_1.jpg`) and favicon served; a person saved with `avatar: male_1` keeps it; full
+`api_smoke.sh` passed (throwaway guests deleted).
