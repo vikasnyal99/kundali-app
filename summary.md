@@ -570,3 +570,7 @@ Person 1 keeps a groom-side explanation instead. The person form keeps its steps
 
 **Artwork:** `km_crests.png`, `km_ornaments.png` in `~/Downloads/KundliMilan_HD_Art/` (crests, green and gold leaves, line mandala),
 processed by `prepare_assets.py`; 27 images, 2.21 MB.
+
+**Deployed 2026-10-31 (`5ecddec`)** through SSM in Chrome: exit 0, `kundli-api` healthy, session closed. Live: crests and ornaments
+served, `api_smoke.sh` passed, Select Person 1 seen in Chrome (empty state). Not seen live: Select Person 2 and the Hindi page, which
+were checked only as test-harness renders. No new APK is needed.
