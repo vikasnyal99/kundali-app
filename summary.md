@@ -553,3 +553,9 @@ and form screens (rendered only in the Flutter test harness). `flutter build ios
 
 **APK:** `mobile/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk` (18.9 MB), needed once for the new native splash and
 launcher icon.
+
+**Deployed 2026-10-31 (`657218f`)** by Claude through SSM in Chrome: `git pull`, `SITE=kundaliapi.zivantaai.com bash
+infra/server-deploy.sh` → exit 0, `kundli-api` healthy, worker restarted, Caddy route active; session closed with `exit`. Live
+checks: artwork, `FontManifest.json` (all four families) and icons served; home renders in Chrome; a person saved with
+`avatar: female_3` keeps it (throwaway guest erased); full `api_smoke.sh` passed. A cold load from the laptop took about 14 s
+until the home images finished (`main.dart.js` alone 6 s).
