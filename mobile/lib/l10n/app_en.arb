@@ -184,5 +184,6 @@
   "dontKnowTime": "I don't know the exact time",
   "approximateTime": "Time is approximate (within about an hour)",
   "noPeopleYet": "No saved people yet. Use Add New to save someone's birth details.",
-  "rank": "Rank"
+  "rank": "Rank",
+  "chooseAvatar": "Photo (optional)"
 }

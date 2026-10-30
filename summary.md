@@ -481,3 +481,34 @@ by language choice). Checked in Chrome against a local server with sample data: 
 Not reproduced from the design: painted illustrations and photo avatars (replaced by vector art and initials); the
 hamburger and bell icons (no menu or notifications exist).
 APKs rebuilt: `app-arm64-v8a-release.apk` (16.6 MB), `app-release.apk` (46.2 MB).
+
+## 16. Owner's asset pack (2026-10-30)
+
+**Source:** `/home/vikas/Downloads/KundliMilan_Individual_Assets/KundliMilan_Separate_App_Assets/` (94 PNGs, 22 MB).
+Its README says they are upscaled crops of one composite, some with neighbouring-image slivers. They are converted
+by `mobile/tool/prepare_assets.sh` (ImageMagick 6 or 7) into `mobile/assets/images/*.jpg` (about 0.9 MB in total,
+loaded per screen). Crops skip the white gutters and slivers, which were measured per column.
+
+| Asset | Used for |
+|---|---|
+| `splash_english` / `splash_hindi` | Language screen (buttons placed below the artwork's tagline, sized to the artwork's proportions) and the native splash (fades in with a slow zoom; language remembered from the web app as `splash_locale`) |
+| `home_river_sunrise` | Home banner |
+| `night_temple_lotus` | Full-report card (darkened, white text, gold button from the button samples) |
+| `night_astrology` | Settings banner |
+| `light_zodiac_pattern` | Faint background of the Detailed Report |
+| `zodiac_wheel`, `lotus` | Behind and beside the score ring |
+| `sun_moon`, `vedic_still_life`, `kundli_scroll` | Doshas tab, Remedies tab, form confirm step |
+| `states/*` | Empty people/reports/picker, summary error, pending match |
+| `avatars/female_1, male_1, male_2` | Optional "Photo" choice on a person (new `avatar` field, display only; server accepts only these three) |
+| `app_icon_dark` | Android launcher icons, web favicon and PWA icons |
+
+Not used: `avatar_female_2` (the pack's crop cuts through the face); the 17 icon PNGs (each has a half-cropped
+background circle; the app's vector icons match their style); the wordmarks (already part of the splash artwork);
+button samples (style reference only). Art on white is drawn with a multiply blend (`theme.dart` `Art`), so the white
+takes the colour of the page or card. `art.dart` (vector stand-ins) was removed.
+
+**Verification:** backend `pytest` 63 passed, 7 skipped (new: avatar optional and limited to the set). `flutter
+analyze` clean, `flutter test` 14 passed (form sends `avatar`; language screen and native splash show the right
+artwork). Seen in Chrome against a local server: language screen (English) and home banner. Chrome screenshots
+then kept timing out on the image-heavy screens, so the remaining screens were not seen in the browser.
+APKs: `app-arm64-v8a-release.apk` 17.7 MB, `app-release.apk` 47.4 MB (needed once for the splash art and icon).

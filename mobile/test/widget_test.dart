@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -18,10 +19,15 @@ void main() {
       );
       await tester.pumpWidget(KundliApp(api: api));
       await tester.pumpAndSettle();
+      bool showsArtwork(String name) => tester
+          .widgetList<Image>(find.byType(Image))
+          .any(
+            (i) => (i.image as AssetImage).assetName == 'assets/images/$name',
+          );
       expect(
-        find.text('Ancient Wisdom\nfor a Brighter Tomorrow'),
-        findsOneWidget,
-      );
+        showsArtwork('splash_en.jpg'),
+        isTrue,
+      ); // wordmark and tagline are in the artwork
       expect(find.text('Traditional • Trusted • Thoughtful'), findsOneWidget);
       await tester.tap(find.text('हिंदी'));
       await tester.pumpAndSettle();

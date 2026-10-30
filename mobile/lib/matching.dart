@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'api.dart';
-import 'art.dart';
 import 'common.dart';
 import 'people.dart';
 import 'theme.dart';
@@ -269,7 +268,11 @@ class FixedPersonCard extends StatelessWidget {
     color: const Color(0xfff1e9da),
     child: Row(
       children: [
-        Avatar(person['display_name'].toString(), size: 52),
+        Avatar(
+          person['display_name'].toString(),
+          size: 52,
+          image: person['avatar'] as String?,
+        ),
         const SizedBox(width: 14),
         Expanded(
           child: Column(
@@ -420,7 +423,10 @@ class _ComparisonResultsState extends State<ComparisonResults> {
               ),
             ),
             const SizedBox(width: 12),
-            Avatar(p2['display_name'].toString()),
+            Avatar(
+              p2['display_name'].toString(),
+              image: p2['avatar'] as String?,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -704,7 +710,11 @@ class _MatchDetailState extends State<MatchDetail> {
     final people = match['people'] as List;
     Widget one(Map p) => Column(
       children: [
-        Avatar(p['display_name'].toString(), size: 60),
+        Avatar(
+          p['display_name'].toString(),
+          size: 60,
+          image: p['avatar'] as String?,
+        ),
         const SizedBox(height: 6),
         Text(
           firstName(p['display_name']),
@@ -831,8 +841,16 @@ class _MatchDetailState extends State<MatchDetail> {
             child: Stack(
               alignment: Alignment.center,
               children: [
+                const Opacity(
+                  opacity: 0.35,
+                  child: Art('zodiac_wheel', width: 210, height: 210),
+                ),
                 ScoreRing(score: score, caption: t('outOf36')),
-                const Positioned(right: 0, top: 18, child: LotusIcon()),
+                const Positioned(
+                  right: -6,
+                  top: 6,
+                  child: Art('lotus', width: 48, height: 48),
+                ),
               ],
             ),
           ),
@@ -879,6 +897,7 @@ class _MatchDetailState extends State<MatchDetail> {
         else if (summary == null)
           Column(
             children: [
+              const Art('state_no_data', height: 120),
               Text(summaryError ?? t('error')),
               TextButton(onPressed: load, child: Text(t('retry'))),
             ],
@@ -1010,7 +1029,9 @@ class _MatchDetailState extends State<MatchDetail> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
+        const Art('sun_moon', height: 110),
+        const SizedBox(height: 12),
         for (final d in ['nadi', 'bhakoot', 'gana'])
           if (rows.containsKey(d))
             Padding(
@@ -1060,7 +1081,9 @@ class _MatchDetailState extends State<MatchDetail> {
   Widget remediesTab() => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      const SizedBox(height: 16),
+      const SizedBox(height: 12),
+      const Art('vedic_still_life', height: 130),
+      const SizedBox(height: 12),
       if (summary != null)
         AppCard(
           child: Column(
@@ -1096,47 +1119,83 @@ class _MatchDetailState extends State<MatchDetail> {
   Widget reportSection() {
     final status = report?['status'];
     final working = reportBusy || status == 'pending' || status == 'processing';
-    return AppCard(
-      color: Palette.greenSoft,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(t('fullReport'), style: heading(17)),
-          const SizedBox(height: 6),
-          Text(t('fullReportBody')),
-          const SizedBox(height: 16),
-          if (working) ...[
-            const LinearProgressIndicator(),
-            const SizedBox(height: 10),
-            Text(t('preparingReport'), textAlign: TextAlign.center),
-          ] else if (status == 'ready')
-            PrimaryButton(
-              t('download'),
-              arrow: false,
-              icon: Icons.download,
-              onPressed: download,
-            )
-          else
-            PrimaryButton(
-              t(status == 'failed' ? 'retry' : 'generateReport'),
-              arrow: false,
-              icon: Icons.picture_as_pdf_outlined,
-              onPressed: generateReport,
+    const light = TextStyle(color: Color(0xfff6ecd6), height: 1.4);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/images/report_card.jpg'),
+            fit: BoxFit.cover,
+          ),
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          // Darken the artwork so the text and button stay readable.
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withValues(alpha: 0.35),
+                const Color(0xff10241a).withValues(alpha: 0.88),
+              ],
             ),
-          if (status == 'failed')
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Text(failureText(widget.t, report?['failure_code'])),
-            ),
-          if (reportError != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Text(
-                reportError!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-            ),
-        ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 40),
+              Text(t('fullReport'), style: heading(19, color: Colors.white)),
+              const SizedBox(height: 6),
+              Text(t('fullReportBody'), style: light),
+              const SizedBox(height: 18),
+              if (working) ...[
+                const LinearProgressIndicator(
+                  color: Palette.gold,
+                  backgroundColor: Colors.white24,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  t('preparingReport'),
+                  textAlign: TextAlign.center,
+                  style: light,
+                ),
+              ] else if (status == 'ready')
+                PrimaryButton(
+                  t('download'),
+                  arrow: false,
+                  gold: true,
+                  icon: Icons.download,
+                  onPressed: download,
+                )
+              else
+                PrimaryButton(
+                  t(status == 'failed' ? 'retry' : 'generateReport'),
+                  arrow: false,
+                  gold: true,
+                  icon: Icons.picture_as_pdf_outlined,
+                  onPressed: generateReport,
+                ),
+              if (status == 'failed')
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Text(
+                    failureText(widget.t, report?['failure_code']),
+                    style: light,
+                  ),
+                ),
+              if (reportError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Text(
+                    reportError!,
+                    style: const TextStyle(color: Color(0xffffb4a8)),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1158,54 +1217,65 @@ class _MatchDetailState extends State<MatchDetail> {
             ),
         ],
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-            children: [
-              couple(),
-              const SizedBox(height: 16),
-              if (busy) const LinearProgressIndicator(),
-              if (error != null) Text(error!),
-              if (facts != null) ...[
-                tabs(),
-                [
-                  summaryTab(facts),
-                  gunaTab(facts),
-                  doshaTab(facts),
-                  remediesTab(),
-                ][tab],
-                const SizedBox(height: 20),
-                reportSection(),
-              ] else ...[
-                const SizedBox(height: 30),
-                Icon(
-                  match['status'] == 'failed'
-                      ? Icons.info_outline
-                      : Icons.hourglass_top,
-                  size: 50,
-                  color: Palette.gold,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  match['status'] == 'failed'
-                      ? (match['failure_code'] == 'calculation_unavailable'
-                            ? t('unavailable')
-                            : failureText(widget.t, match['failure_code']))
-                      : t(match['status']),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 20),
-                PrimaryButton(
-                  t(match['status'] == 'failed' ? 'retry' : 'refresh'),
-                  arrow: false,
-                  onPressed: busy ? null : retry,
-                ),
-              ],
-            ],
+      body: Stack(
+        children: [
+          const Positioned.fill(
+            child: Opacity(
+              opacity: 0.22,
+              child: Art('zodiac_pattern', fit: BoxFit.cover, on: null),
+            ),
           ),
-        ),
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+                children: [
+                  couple(),
+                  const SizedBox(height: 16),
+                  if (busy) const LinearProgressIndicator(),
+                  if (error != null) Text(error!),
+                  if (facts != null) ...[
+                    tabs(),
+                    [
+                      summaryTab(facts),
+                      gunaTab(facts),
+                      doshaTab(facts),
+                      remediesTab(),
+                    ][tab],
+                    const SizedBox(height: 20),
+                    reportSection(),
+                  ] else ...[
+                    const SizedBox(height: 30),
+                    if (match['status'] == 'failed')
+                      const Icon(
+                        Icons.info_outline,
+                        size: 50,
+                        color: Palette.gold,
+                      )
+                    else
+                      const Art('state_processing', height: 150),
+                    const SizedBox(height: 16),
+                    Text(
+                      match['status'] == 'failed'
+                          ? (match['failure_code'] == 'calculation_unavailable'
+                                ? t('unavailable')
+                                : failureText(widget.t, match['failure_code']))
+                          : t(match['status']),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+                    PrimaryButton(
+                      t(match['status'] == 'failed' ? 'retry' : 'refresh'),
+                      arrow: false,
+                      onPressed: busy ? null : retry,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

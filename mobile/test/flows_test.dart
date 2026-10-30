@@ -464,6 +464,7 @@ void main() {
         'time_accuracy': 'exact',
         'birth_time_local': '21:30:00',
         'fold': null,
+        'avatar': null,
       });
     },
   );
@@ -478,6 +479,7 @@ void main() {
       );
       await openEditor(tester);
       await tester.enterText(find.byType(TextFormField).first, 'Kirti');
+      await tester.tap(find.byKey(const ValueKey('avatar-female_1')));
       await tester.enterText(
         find.widgetWithText(TextFormField, 'City, town or 6-digit pincode'),
         'Somewhere',
@@ -516,6 +518,7 @@ void main() {
       expect(body['time_accuracy'], 'unknown');
       expect(body.containsKey('birth_time_local'), isFalse);
       expect(body['birth_date'], '1996-02-29');
+      expect(body['avatar'], 'female_1');
     },
   );
 }

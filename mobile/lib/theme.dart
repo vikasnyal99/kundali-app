@@ -16,6 +16,40 @@ class Palette {
   static const orange = Color(0xffd9822b);
 }
 
+/// Portraits from the owner's asset pack that a person can pick (initials otherwise).
+const avatarChoices = ['female_1', 'male_1', 'male_2'];
+
+/// An illustration from assets/images (see tool/prepare_assets.sh). The pack's art sits on white, so it
+/// is multiplied with the colour behind it ([on]) and the white disappears into the page or card.
+class Art extends StatelessWidget {
+  final String name;
+  final double? width, height;
+  final BoxFit fit;
+  final Color? on;
+  final Alignment alignment;
+  const Art(
+    this.name, {
+    super.key,
+    this.width,
+    this.height,
+    this.fit = BoxFit.contain,
+    this.on = Palette.background,
+    this.alignment = Alignment.center,
+  });
+  @override
+  Widget build(BuildContext context) => Image.asset(
+    'assets/images/$name.jpg',
+    width: width,
+    height: height,
+    fit: fit,
+    alignment: alignment,
+    color: on,
+    colorBlendMode: on == null ? null : BlendMode.multiply,
+    gaplessPlayback: true,
+    errorBuilder: (_, _, _) => SizedBox(width: width, height: height),
+  );
+}
+
 /// Serif headings: Noto Serif (Latin) with Noto Serif Devanagari, bundled as subsets in assets/fonts.
 TextStyle heading(double size, {Color color = Palette.ink}) => TextStyle(
   fontFamily: 'KundliSerif',
@@ -118,7 +152,7 @@ ThemeData kundliTheme() {
 class PrimaryButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
-  final bool arrow;
+  final bool arrow, gold;
   final IconData? icon;
   const PrimaryButton(
     this.label, {
@@ -126,6 +160,7 @@ class PrimaryButton extends StatelessWidget {
     this.onPressed,
     this.arrow = true,
     this.icon,
+    this.gold = false,
   });
   @override
   Widget build(BuildContext context) {
@@ -137,8 +172,10 @@ class PrimaryButton extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(28),
           gradient: enabled
-              ? const LinearGradient(
-                  colors: [Palette.green, Palette.greenDark],
+              ? LinearGradient(
+                  colors: gold
+                      ? const [Color(0xffe0b25a), Color(0xffb5832c)]
+                      : const [Palette.green, Palette.greenDark],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 )
@@ -211,11 +248,12 @@ class AppCard extends StatelessWidget {
   );
 }
 
-/// Initials on a warm tone picked from the name, standing in for the design's portrait avatars.
+/// A chosen portrait ([image], one of [avatarChoices]) or initials on a warm tone picked from the name.
 class Avatar extends StatelessWidget {
   final String name;
   final double size;
-  const Avatar(this.name, {super.key, this.size = 46});
+  final String? image;
+  const Avatar(this.name, {super.key, this.size = 46, this.image});
   static const tones = [
     (Color(0xfff3d9c4), Color(0xff8a4b23)),
     (Color(0xffe4ecdc), Color(0xff2f5b3c)),
@@ -229,6 +267,20 @@ class Avatar extends StatelessWidget {
     final initials = words.take(2).map((w) => w.characters.first).join();
     final tone =
         tones[name.codeUnits.fold<int>(0, (a, b) => a + b) % tones.length];
+    if (avatarChoices.contains(image)) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 2),
+          image: DecorationImage(
+            image: AssetImage('assets/images/avatar_$image.jpg'),
+            fit: BoxFit.cover,
+          ),
+        ),
+      );
+    }
     return Container(
       width: size,
       height: size,

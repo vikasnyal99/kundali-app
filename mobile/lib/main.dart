@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api.dart';
-import 'art.dart';
 import 'common.dart';
 import 'matching.dart';
 import 'people.dart';
@@ -106,7 +105,8 @@ class _KundliAppState extends State<KundliApp> {
   );
 }
 
-/// First screen of the design: mandala, name, tagline and the two language buttons.
+/// First screen: the asset pack's splash artwork for the current language (its wordmark and tagline
+/// are part of the image) with real buttons over the river; choosing a language enters the app.
 class LanguageScreen extends StatelessWidget {
   final Translate t;
   final String locale;
@@ -121,12 +121,12 @@ class LanguageScreen extends StatelessWidget {
     final active = code == locale;
     return SizedBox(
       width: double.infinity,
-      height: 56,
+      height: 54,
       child: active
           ? PrimaryButton(label, arrow: false, onPressed: () => onChoose(code))
           : OutlinedButton(
               style: OutlinedButton.styleFrom(
-                backgroundColor: Palette.surface,
+                backgroundColor: Palette.surface.withValues(alpha: 0.94),
                 side: const BorderSide(color: Palette.border),
                 shape: const StadiumBorder(),
               ),
@@ -145,48 +145,67 @@ class LanguageScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    body: Stack(
-      children: [
-        Positioned.fill(child: CustomPaint(painter: BotanicalPainter())),
-        SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 360),
-                child: Column(
-                  children: [
-                    CustomPaint(
-                      size: const Size.square(150),
-                      painter: MandalaPainter(),
+    backgroundColor: Palette.background,
+    body: LayoutBuilder(
+      builder: (context, size) {
+        // Keep the portrait artwork whole: never wider than its own proportions at this height,
+        // so the buttons can sit just below the artwork's tagline (which ends about 59% down).
+        final width = [
+          480.0,
+          size.maxHeight * 1074 / 1920,
+          size.maxWidth,
+        ].reduce((a, b) => a < b ? a : b);
+        return Center(
+          child: SizedBox(
+            width: width,
+            height: size.maxHeight,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 350),
+                    child: Image.asset(
+                      'assets/images/splash_$locale.jpg',
+                      key: ValueKey(locale),
+                      width: width,
+                      height: size.maxHeight,
+                      fit: BoxFit.cover,
+                      alignment: Alignment.topCenter,
                     ),
-                    const SizedBox(height: 22),
-                    Text(
-                      t('appName'),
-                      style: heading(38, color: Palette.green),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      t('appTagline'),
-                      textAlign: TextAlign.center,
-                      style: heading(17, color: Palette.ink),
-                    ),
-                    const SizedBox(height: 36),
-                    choice('en', 'English'),
-                    const SizedBox(height: 14),
-                    choice('hi', 'हिंदी'),
-                    const SizedBox(height: 40),
-                    Text(
-                      t('footerValues'),
-                      style: const TextStyle(color: Color(0xff8a6a3a)),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+                Positioned(
+                  left: width * 0.11,
+                  right: width * 0.11,
+                  top: size.maxHeight * 0.62,
+                  child: Column(
+                    children: [
+                      choice('en', 'English'),
+                      const SizedBox(height: 12),
+                      choice('hi', 'हिंदी'),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Palette.surface.withValues(alpha: 0.85),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          t('footerValues'),
+                          style: const TextStyle(color: Color(0xff8a6a3a)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-      ],
+        );
+      },
     ),
   );
 }
@@ -401,10 +420,15 @@ class _ShellState extends State<Shell> {
           color: const Color(0xfff7efe2),
           child: Column(
             children: [
-              SizedBox(
-                height: 150,
+              const SizedBox(
+                height: 170,
                 width: double.infinity,
-                child: CustomPaint(painter: HeroScenePainter()),
+                child: Art(
+                  'home_banner',
+                  fit: BoxFit.cover,
+                  alignment: Alignment(0, -0.2),
+                  on: null,
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 6, 20, 20),
@@ -510,8 +534,8 @@ class _ShellState extends State<Shell> {
             padding: const EdgeInsets.symmetric(vertical: 40),
             child: Column(
               children: [
-                const Icon(Icons.people_outline, size: 56, color: Palette.gold),
-                const SizedBox(height: 16),
+                const Art('state_no_people', height: 170),
+                const SizedBox(height: 12),
                 Text(t('emptyPeople'), style: heading(19)),
                 const SizedBox(height: 8),
                 Text(t('emptyPeopleBody'), textAlign: TextAlign.center),
@@ -551,8 +575,14 @@ class _ShellState extends State<Shell> {
     children: [
       if (reports.isEmpty)
         Padding(
-          padding: const EdgeInsets.all(40),
-          child: Text(t('emptyReports'), textAlign: TextAlign.center),
+          padding: const EdgeInsets.symmetric(vertical: 30),
+          child: Column(
+            children: [
+              const Art('state_no_reports', height: 170),
+              const SizedBox(height: 12),
+              Text(t('emptyReports'), textAlign: TextAlign.center),
+            ],
+          ),
         ),
       for (final r in reports.reversed)
         ReportRow(
@@ -591,6 +621,33 @@ class _ShellState extends State<Shell> {
   Widget settingsPage() => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
+      ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: SizedBox(
+          height: 130,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              const Art('settings_banner', fit: BoxFit.cover, on: null),
+              Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(t('appName'), style: heading(24, color: Colors.white)),
+                    Text(
+                      t('appTagline').replaceAll('\n', ' '),
+                      style: const TextStyle(color: Color(0xfff2e3c2)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      const SizedBox(height: 14),
       AppCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

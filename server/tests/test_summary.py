@@ -100,3 +100,10 @@ def test_full_report_has_charts_and_avakhada_with_real_engine():
     assert html.count('<svg')==2 and 'अवकहड़ा चक्र' in html and 'नाड़ी दोष' in html and 'Deepak' in html
     pdf=services.render_pdf(m,'en',summary.build(m,'en')[0])
     assert pdf.startswith(b'%PDF')
+
+def test_person_avatar_is_optional_and_limited_to_the_app_set(client):
+    h=token(client)
+    assert person(client,h,'A')['avatar'] is None
+    assert person(client,h,'B',avatar='female_1')['avatar']=='female_1'
+    r=client.post('/v1/people',headers=h,json={'display_name':'C','birth_date':'1997-09-14','birth_time_local':'09:30:00','birth_timezone':'Asia/Kolkata','birth_place_name':'Delhi','latitude':28.6,'longitude':77.2,'avatar':'someone_else'})
+    assert r.status_code==422

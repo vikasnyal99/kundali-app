@@ -6,7 +6,6 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-import 'art.dart';
 import 'theme.dart';
 
 /// Native entry point of the Android app: a short animated splash, then the web app (lib/main.dart
@@ -19,8 +18,13 @@ const appUrl = String.fromEnvironment(
 // Same palette as the web app (theme.dart), so the hand-over from splash to app is seamless.
 const cream = Palette.background, maroon = Palette.green;
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final prefs = await SharedPreferences.getInstance();
+  // Language for the splash artwork: remembered from the web app (see rememberLocale), else the old
+  // native app's choice.
+  final locale =
+      prefs.getString('splash_locale') ?? prefs.getString('locale') ?? 'en';
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: cream,
@@ -30,10 +34,10 @@ void main() {
     ),
   );
   runApp(
-    const MaterialApp(
+    MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'KundliMilan',
-      home: ShellScreen(),
+      home: ShellScreen(locale: locale == 'hi' ? 'hi' : 'en'),
     ),
   );
 }
@@ -50,7 +54,8 @@ String handoffScript(Map<String, Object?> payload) =>
     "location.replace('./');";
 
 class ShellScreen extends StatefulWidget {
-  const ShellScreen({super.key});
+  final String locale;
+  const ShellScreen({super.key, this.locale = 'en'});
   @override
   State<ShellScreen> createState() => _ShellScreenState();
 }
@@ -64,6 +69,7 @@ class _ShellScreenState extends State<ShellScreen>
   );
   late final WebViewController web;
   Map<String, Object?>? handoff;
+  late final splashLocale = widget.locale;
   bool ready = false, failed = false, introDone = false;
   int attempt = 0;
 
@@ -151,7 +157,20 @@ class _ShellScreenState extends State<ShellScreen>
     await Future<void>.delayed(const Duration(milliseconds: 250));
     if (mounted && forAttempt == attempt && !failed) {
       setState(() => ready = true);
+      rememberLocale();
     }
+  }
+
+  /// Keeps the next splash in the language chosen inside the web app.
+  Future<void> rememberLocale() async {
+    try {
+      final value = await web.runJavaScriptReturningResult(
+        "localStorage.getItem('flutter.locale') || ''",
+      );
+      final locale = value.toString().contains('hi') ? 'hi' : 'en';
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('splash_locale', locale);
+    } catch (_) {}
   }
 
   /// Back closes the web app's top screen or dialog first; at its home screen it leaves the app.
@@ -189,7 +208,11 @@ class _ShellScreenState extends State<ShellScreen>
                   duration: const Duration(milliseconds: 450),
                   child: failed
                       ? Offline(onRetry: open)
-                      : Splash(intro: intro, waiting: introDone && !ready),
+                      : Splash(
+                          intro: intro,
+                          waiting: introDone && !ready,
+                          locale: splashLocale,
+                        ),
                 ),
               ),
             ],
@@ -200,61 +223,54 @@ class _ShellScreenState extends State<ShellScreen>
   }
 }
 
+/// The asset pack's splash artwork (wordmark and tagline included) fading in with a slow, gentle zoom.
 class Splash extends StatelessWidget {
   final Animation<double> intro;
   final bool waiting;
-  const Splash({super.key, required this.intro, required this.waiting});
+  final String locale;
+  const Splash({
+    super.key,
+    required this.intro,
+    required this.waiting,
+    this.locale = 'en',
+  });
   @override
   Widget build(BuildContext context) => ColoredBox(
     color: cream,
-    child: Center(
-      child: AnimatedBuilder(
-        animation: intro,
-        builder: (context, _) {
-          final text = Curves.easeOut.transform(
-            ((intro.value - 0.55) / 0.45).clamp(0, 1),
-          );
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CustomPaint(
-                size: const Size.square(150),
-                painter: MandalaPainter(
-                  Curves.easeOut.transform((intro.value / 0.75).clamp(0, 1)),
+    child: AnimatedBuilder(
+      animation: intro,
+      builder: (context, _) {
+        final t = Curves.easeOut.transform(intro.value);
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            Opacity(
+              opacity: (intro.value / 0.4).clamp(0.0, 1.0),
+              child: Transform.scale(
+                scale: 1.08 - 0.08 * t,
+                child: Image.asset(
+                  'assets/images/splash_$locale.jpg',
+                  fit: BoxFit.cover,
+                  alignment: Alignment.topCenter,
                 ),
               ),
-              const SizedBox(height: 28),
-              Opacity(
-                opacity: text,
-                child: Transform.translate(
-                  offset: Offset(0, 12 * (1 - text)),
-                  child: Column(
-                    children: [
-                      Text('KundliMilan', style: heading(34, color: maroon)),
-                      const SizedBox(height: 6),
-                      Text(
-                        'कुंडली मिलान · Guna Milan',
-                        style: heading(15, color: const Color(0xff8a6a3a)),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 28),
-              SizedBox(
+            ),
+            Align(
+              alignment: const Alignment(0, 0.62),
+              child: SizedBox(
                 width: 120,
                 height: 3,
                 child: waiting
                     ? const LinearProgressIndicator(
                         color: maroon,
-                        backgroundColor: Color(0xfff1e2c8),
+                        backgroundColor: Color(0x66ffffff),
                       )
                     : null,
               ),
-            ],
-          );
-        },
-      ),
+            ),
+          ],
+        );
+      },
     ),
   );
 }

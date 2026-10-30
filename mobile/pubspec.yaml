@@ -24,6 +24,7 @@ flutter:
   assets:
     - lib/l10n/app_en.arb
     - lib/l10n/app_hi.arb
+    - assets/images/
   fonts:
     - family: KundliSerif
       fonts:

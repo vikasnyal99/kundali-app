@@ -30,6 +30,7 @@ class _PersonEditorState extends State<PersonEditor> {
   final hour = TextEditingController(), minute = TextEditingController();
   final focus = List.generate(5, (_) => FocusNode());
   Map<String, dynamic>? place;
+  String? avatar;
   String placeText = '';
   bool consent = false, busy = false, pm = false, askFold = false;
   bool unknown = false, approximate = false;
@@ -49,6 +50,7 @@ class _PersonEditorState extends State<PersonEditor> {
     final p = widget.person;
     if (p == null) return;
     name.text = p['display_name'] ?? '';
+    avatar = p['avatar'];
     placeText = p['birth_place_name'] ?? '';
     place = {
       'label': placeText,
@@ -132,6 +134,7 @@ class _PersonEditorState extends State<PersonEditor> {
           'time_accuracy': accuracy,
           if (!unknown) 'birth_time_local': isoTime(),
           'fold': fold,
+          'avatar': avatar,
         },
       );
       if (mounted) Navigator.pop(context, saved);
@@ -242,6 +245,33 @@ class _PersonEditorState extends State<PersonEditor> {
     ),
   );
 
+  /// Initials (default) or one of the asset pack's portraits.
+  Widget avatarPicker() => Wrap(
+    spacing: 12,
+    children: [
+      for (final choice in [null, ...avatarChoices])
+        GestureDetector(
+          key: ValueKey('avatar-${choice ?? 'initials'}'),
+          onTap: () => setState(() => avatar = choice),
+          child: Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: avatar == choice ? Palette.green : Colors.transparent,
+                width: 2.4,
+              ),
+            ),
+            child: Avatar(
+              name.text.trim().isEmpty ? '?' : name.text.trim(),
+              image: choice,
+              size: 50,
+            ),
+          ),
+        ),
+    ],
+  );
+
   Widget details() => Form(
     key: form,
     child: Column(
@@ -252,9 +282,12 @@ class _PersonEditorState extends State<PersonEditor> {
         TextFormField(
           controller: name,
           textCapitalization: TextCapitalization.words,
+          onChanged: (_) => setState(() {}),
           validator: (v) =>
               v == null || v.trim().isEmpty ? t('required') : null,
         ),
+        FieldLabel(t('chooseAvatar')),
+        avatarPicker(),
         FieldLabel(t('birthPlace')),
         placeField(),
         const SizedBox(height: 10),
@@ -355,6 +388,8 @@ class _PersonEditorState extends State<PersonEditor> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const Art('kundli_scroll', height: 110),
+        const SizedBox(height: 8),
         Text(t('reviewDetails'), style: heading(17)),
         const SizedBox(height: 12),
         AppCard(
@@ -363,7 +398,7 @@ class _PersonEditorState extends State<PersonEditor> {
             children: [
               Row(
                 children: [
-                  Avatar(name.text.trim()),
+                  Avatar(name.text.trim(), image: avatar),
                   const SizedBox(width: 12),
                   Expanded(child: Text(name.text.trim(), style: heading(18))),
                   TextButton(
@@ -601,11 +636,19 @@ class _PickPersonPageState extends State<PickPersonPage> {
                         children: [
                           if (shown.isEmpty)
                             Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Text(
-                                t('noPeopleYet'),
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(color: Palette.muted),
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                children: [
+                                  const Art('state_no_people', height: 150),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    t('noPeopleYet'),
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: Palette.muted,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           for (final p in shown)

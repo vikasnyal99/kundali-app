@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kundli_milan/art.dart';
 import 'package:kundli_milan/shell.dart';
 
 void main() {
@@ -53,23 +52,26 @@ void main() {
     },
   );
 
-  testWidgets('splash draws the mandala and shows the name', (tester) async {
+  testWidgets('splash shows the artwork for the remembered language', (
+    tester,
+  ) async {
     final controller = AnimationController(
       vsync: const TestVSync(),
       duration: const Duration(seconds: 1),
     );
     await tester.pumpWidget(
-      MaterialApp(home: Splash(intro: controller, waiting: false)),
+      MaterialApp(
+        home: Splash(intro: controller, waiting: true, locale: 'hi'),
+      ),
     );
     controller.value = 1;
     await tester.pump();
-    expect(find.text('KundliMilan'), findsOneWidget);
+    final image = tester.widget<Image>(find.byType(Image));
     expect(
-      find.byWidgetPredicate(
-        (w) => w is CustomPaint && w.painter is MandalaPainter,
-      ),
-      findsOneWidget,
+      (image.image as AssetImage).assetName,
+      'assets/images/splash_hi.jpg',
     );
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
     controller.dispose();
   });
 

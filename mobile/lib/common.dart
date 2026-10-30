@@ -129,7 +129,10 @@ class PersonRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(
         children: [
-          Avatar(person['display_name'].toString()),
+          Avatar(
+            person['display_name'].toString(),
+            image: person['avatar'] as String?,
+          ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
