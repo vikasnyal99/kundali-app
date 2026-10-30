@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,8 +7,21 @@ import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kundli_milan/api.dart';
 import 'package:kundli_milan/main.dart';
+import 'package:kundli_milan/theme.dart';
 
 void main() {
+  Motion.ambient = false;
+  test('every font family the theme asks for is bundled', () {
+    final pubspec = File('pubspec.yaml').readAsStringSync();
+    for (final family in [
+      'KundliSans',
+      'KundliSansDeva',
+      'KundliSerif',
+      'KundliSerifDeva',
+    ]) {
+      expect(pubspec, contains('- family: $family\n'));
+    }
+  });
   testWidgets(
     'choosing a language on the first screen saves it and opens the app',
     (tester) async {
@@ -24,10 +38,12 @@ void main() {
           .any(
             (i) => (i.image as AssetImage).assetName == 'assets/images/$name',
           );
+      expect(showsArtwork('splash_bg.webp'), isTrue);
+      expect(showsArtwork('mandala.webp'), isTrue);
       expect(
-        showsArtwork('splash_en.jpg'),
-        isTrue,
-      ); // wordmark and tagline are in the artwork
+        find.text('KundliMilan'),
+        findsOneWidget,
+      ); // live text, not artwork
       expect(find.text('Traditional • Trusted • Thoughtful'), findsOneWidget);
       await tester.tap(find.text('हिंदी'));
       await tester.pumpAndSettle();

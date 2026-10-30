@@ -45,44 +45,44 @@ LABELS={'en':{'title':'Kundli matching report','subtitle':'Ashta Koota Guna Mila
   'no_chart':'जन्म समय अज्ञात: लग्न कुंडली के लिए सटीक समय आवश्यक है, इसलिए यह नहीं बनाई गई।','noon':'ग्रह स्थिति दोपहर 12:00 बजे की (जन्म समय अज्ञात)।'}}
 
 CSS='''
-@page{size:A4;margin:16mm 15mm 18mm;background:#fffaf0;
- @bottom-center{content:FOOTER " · " counter(page) " / " counter(pages);font-size:8pt;color:#8a6a52}}
-body{font-family:FONTS;color:#2b1d14;font-size:10pt;line-height:1.45;margin:0}
-.frame{position:fixed;top:-8mm;bottom:-10mm;left:-7mm;right:-7mm;border:2.2pt double #8b2c1a;border-radius:2mm}
-h1,h2,h3{font-family:HEADFONTS;color:#7a2e1d;margin:0}
-h2{font-size:13.5pt;margin:0 0 3mm;padding-bottom:1.2mm;border-bottom:1pt solid #d9a441}
-h2:before{content:"";display:inline-block;width:2.3mm;height:2.3mm;background:#d9822b;transform:rotate(45deg);margin:0 2.6mm .6mm .6mm}
+@page{size:A4;margin:16mm 15mm 18mm;background:#fbf7ee;
+ @bottom-center{content:FOOTER " · " counter(page) " / " counter(pages);font-size:8pt;color:#8a6a52;vertical-align:top;padding-top:2.5mm}}
+body{font-family:FONTS;color:#23261f;font-size:10pt;line-height:1.45;margin:0}
+.frame{position:fixed;top:-8mm;bottom:-12.5mm;left:-7mm;right:-7mm;border:2.2pt double #2f5b3c;border-radius:2mm}
+h1,h2,h3{font-family:HEADFONTS;color:#1f4a33;margin:0}
+h2{font-size:13.5pt;margin:0 0 3mm;padding-bottom:1.2mm;border-bottom:1pt solid #c9963b}
+h2:before{content:"";display:inline-block;width:2.3mm;height:2.3mm;background:#c9963b;transform:rotate(45deg);margin:0 2.6mm .6mm .6mm}
 h3{font-size:11pt;margin:3mm 0 1mm}
 .page{page-break-after:always}.page:last-child{page-break-after:auto}
-.inv{text-align:center;color:#c1611c;font-size:12pt;letter-spacing:.5pt;margin-top:2mm}
+.inv{text-align:center;color:#a97c2c;font-size:12pt;letter-spacing:.5pt;margin-top:2mm}
 .title{text-align:center;margin:3mm 0 1mm;font-size:24pt}
 .sub{text-align:center;color:#8a6a52;font-size:11pt;letter-spacing:1.5pt;text-transform:uppercase;margin-bottom:5mm}
 .couple{display:flex;align-items:stretch;gap:4mm;margin-bottom:5mm}
 .side{flex:1;background:#fff;border:1pt solid #e3c48f;border-radius:3mm;padding:3.5mm 4mm}
-.side .role{font-size:8pt;color:#a0522d;text-transform:uppercase;letter-spacing:.8pt}
-.side .nm{font-family:HEADFONTS;font-size:15pt;color:#2b1d14;margin:1mm 0}
+.side .role{font-size:8pt;color:#7a6a3a;text-transform:uppercase;letter-spacing:.8pt}
+.side .nm{font-family:HEADFONTS;font-size:15pt;color:#23261f;margin:1mm 0}
 .side .meta{font-size:9pt;color:#5b4636}
-.knot{align-self:center;width:4mm;height:4mm;background:#c1611c;transform:rotate(45deg);border:1.2pt solid #fffaf0;outline:1pt solid #c1611c}
-.medal{width:36mm;height:36mm;margin:0 auto 2mm;border-radius:50%;background:#7a2e1d;color:#fff;text-align:center;border:3pt solid #d9a441;box-shadow:0 0 0 2pt #fffaf0,0 0 0 3pt #d9a441}
+.knot{align-self:center;width:4mm;height:4mm;background:#a97c2c;transform:rotate(45deg);border:1.2pt solid #fbf7ee;outline:1pt solid #a97c2c}
+.medal{width:36mm;height:36mm;margin:0 auto 2mm;border-radius:50%;background:#1f4a33;color:#fff;text-align:center;border:3pt solid #c9963b;box-shadow:0 0 0 2pt #fbf7ee,0 0 0 3pt #c9963b}
 .medal .big{font-family:HEADFONTS;font-size:30pt;line-height:1;padding-top:7mm}
 .medal .of{font-size:8.5pt;color:#f6dfb6}
-.band{text-align:center;font-family:HEADFONTS;font-size:14pt;color:#7a2e1d;margin:1.5mm 0 0}
+.band{text-align:center;font-family:HEADFONTS;font-size:14pt;color:#1f4a33;margin:1.5mm 0 0}
 .bar{position:relative;height:3.2mm;border-radius:2mm;margin:3mm 10mm 1mm;background:linear-gradient(to right,#c0392b 0%,#c0392b 50%,#e0a030 50%,#e0a030 69.4%,#5e9e4f 69.4%,#5e9e4f 91.6%,#2e7d32 91.6%)}
-.pin{position:absolute;top:-1.6mm;width:2mm;height:6.4mm;margin-left:-1mm;background:#2b1d14;border-radius:1mm}
+.pin{position:absolute;top:-1.6mm;width:2mm;height:6.4mm;margin-left:-1mm;background:#23261f;border-radius:1mm}
 .scale{text-align:center;font-size:8pt;color:#8a6a52;margin-bottom:2mm}
 .chips{text-align:center;margin:2mm 0 5mm}
 .chip{display:inline-block;border-radius:5mm;padding:1mm 3.5mm;margin:0 1mm;font-size:9pt;border:1pt solid}
 .chip.bad{color:#9b2c1f;border-color:#e2a99f;background:#fdf0ed}.chip.ok{color:#2e6b34;border-color:#a8d3ad;background:#f0f8f0}
 .chip.na{color:#6b5a4a;border-color:#d9cbb8;background:#f7f1e8}
-.box{background:#fff;border:1pt solid #e3c48f;border-left:3pt solid #d9822b;border-radius:2mm;padding:3mm 4mm;margin-bottom:4mm}
-.box .hl{font-family:HEADFONTS;font-size:12pt;color:#7a2e1d;margin-bottom:1mm}
+.box{background:#fff;border:1pt solid #e3c48f;border-left:3pt solid #c9963b;border-radius:2mm;padding:3mm 4mm;margin-bottom:4mm}
+.box .hl{font-family:HEADFONTS;font-size:12pt;color:#1f4a33;margin-bottom:1mm}
 table{width:100%;border-collapse:collapse;margin-bottom:4mm}
-th{background:#7a2e1d;color:#fff;font-weight:600;font-size:9pt;padding:1.6mm 2mm;text-align:left}
+th{background:#1f4a33;color:#fff;font-weight:600;font-size:9pt;padding:1.6mm 2mm;text-align:left}
 td{padding:1.4mm 2mm;border-bottom:.6pt solid #ead9bf;vertical-align:top}
 tr:nth-child(even) td{background:#fdf4e4}
-td.k{color:#7a2e1d;font-weight:600;width:34%}
+td.k{color:#1f4a33;font-weight:600;width:34%}
 td.c,th.c{text-align:center}
-tr.total td{background:#f6e3c0;font-weight:700;color:#7a2e1d;border-top:1pt solid #d9a441}
+tr.total td{background:#f6e3c0;font-weight:700;color:#1f4a33;border-top:1pt solid #c9963b}
 .pts{display:inline-block;min-width:13mm;text-align:center;border-radius:1.5mm;padding:.3mm 1mm;font-weight:700}
 .full{background:#e3f2e1;color:#2e6b34}.part{background:#fbefd5;color:#8a5a00}.zero{background:#f9dcd7;color:#9b2c1f}
 .small{font-size:8.5pt}.muted{color:#7a6656}
@@ -93,13 +93,13 @@ tr.total td{background:#f6e3c0;font-weight:700;color:#7a2e1d;border-top:1pt soli
 .nchart svg{position:absolute;left:0;top:0}
 .nchart .pl{position:absolute;width:30%;text-align:center;font-weight:700;font-size:9.6pt;line-height:1.25;transform:translateY(-50%)}
 .nochart{width:78mm;height:78mm;margin:0 auto;border:1.2pt dashed #c9a27a;display:flex;align-items:center;justify-content:center;text-align:center;padding:8mm;box-sizing:border-box;color:#7a6656;font-size:9.5pt}
-.charts .cn{font-family:HEADFONTS;color:#7a2e1d;font-size:11pt;margin-bottom:1.5mm}
+.charts .cn{font-family:HEADFONTS;color:#1f4a33;font-size:11pt;margin-bottom:1.5mm}
 .two{display:flex;gap:5mm}.two>div{flex:1}
 .two table td,.two table th{font-size:8.6pt;padding:1.1mm 1.6mm}
 .note{margin-bottom:1.4mm;page-break-inside:avoid;font-size:9.1pt;line-height:1.35}
-.note .nh{font-weight:700;color:#7a2e1d}
+.note .nh{font-weight:700;color:#1f4a33}
 ul{margin:.6mm 0 2mm;padding-left:5mm}li{margin-bottom:.6mm;font-size:9.4pt}
-.disc{font-size:8.5pt;color:#6b5a4a;border-top:1pt solid #d9a441;padding-top:2mm;margin-top:4mm}
+.disc{font-size:8.5pt;color:#6b5a4a;border-top:1pt solid #c9963b;padding-top:2mm;margin-top:4mm}
 '''
 
 def dms(degree):

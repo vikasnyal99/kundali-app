@@ -245,27 +245,34 @@ class _PersonEditorState extends State<PersonEditor> {
     ),
   );
 
-  /// Initials (default) or one of the asset pack's portraits.
+  /// Initials (default) or one of the portraits; the chosen one lifts and gets an emerald ring.
   Widget avatarPicker() => Wrap(
-    spacing: 12,
+    spacing: 8,
+    runSpacing: 8,
     children: [
       for (final choice in [null, ...avatarChoices])
         GestureDetector(
           key: ValueKey('avatar-${choice ?? 'initials'}'),
           onTap: () => setState(() => avatar = choice),
-          child: Container(
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: avatar == choice ? Palette.green : Colors.transparent,
-                width: 2.4,
+          child: AnimatedScale(
+            scale: avatar == choice ? 1.08 : 1,
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutBack,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: avatar == choice ? Palette.green : Colors.transparent,
+                  width: 2.4,
+                ),
               ),
-            ),
-            child: Avatar(
-              name.text.trim().isEmpty ? '?' : name.text.trim(),
-              image: choice,
-              size: 50,
+              child: Avatar(
+                name.text.trim().isEmpty ? '?' : name.text.trim(),
+                image: choice,
+                size: 56,
+              ),
             ),
           ),
         ),
@@ -342,14 +349,14 @@ class _PersonEditorState extends State<PersonEditor> {
                     separator(':'),
                     box(minute, 4, t('min'), 2),
                     const SizedBox(width: 12),
-                    SegmentedButton<bool>(
-                      segments: const [
-                        ButtonSegment(value: false, label: Text('AM')),
-                        ButtonSegment(value: true, label: Text('PM')),
-                      ],
-                      selected: {pm},
-                      showSelectedIcon: false,
-                      onSelectionChanged: (v) => setState(() => pm = v.first),
+                    SizedBox(
+                      width: 116,
+                      child: PillSwitch<bool>(
+                        height: 50,
+                        options: const [(false, 'AM'), (true, 'PM')],
+                        value: pm,
+                        onChanged: (v) => setState(() => pm = v),
+                      ),
                     ),
                   ],
                 ),
@@ -378,7 +385,7 @@ class _PersonEditorState extends State<PersonEditor> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 19, color: Palette.gold),
+          Icon(icon, size: 19, color: const Color(0xffa97c2c)),
           const SizedBox(width: 10),
           Expanded(child: Text(text)),
         ],
@@ -388,7 +395,7 @@ class _PersonEditorState extends State<PersonEditor> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Art('kundli_scroll', height: 110),
+        const Reveal(child: Art('kundli_scroll', height: 130)),
         const SizedBox(height: 8),
         Text(t('reviewDetails'), style: heading(17)),
         const SizedBox(height: 12),
@@ -401,9 +408,9 @@ class _PersonEditorState extends State<PersonEditor> {
                   Avatar(name.text.trim(), image: avatar),
                   const SizedBox(width: 12),
                   Expanded(child: Text(name.text.trim(), style: heading(18))),
-                  TextButton(
+                  SmallButton(
+                    t('edit'),
                     onPressed: () => setState(() => step = 0),
-                    child: Text(t('edit')),
                   ),
                 ],
               ),
@@ -593,18 +600,14 @@ class _PickPersonPageState extends State<PickPersonPage> {
                   children: [
                     SizedBox(
                       width: double.infinity,
-                      child: SegmentedButton<int>(
-                        segments: [
-                          ButtonSegment(
-                            value: 0,
-                            label: Text(t('savedPeopleTab')),
-                          ),
-                          ButtonSegment(value: 1, label: Text(t('addNewTab'))),
+                      child: PillSwitch<int>(
+                        options: [
+                          (0, t('savedPeopleTab')),
+                          (1, t('addNewTab')),
                         ],
-                        selected: const {0},
-                        showSelectedIcon: false,
-                        onSelectionChanged: (v) {
-                          if (v.first == 1) addNew();
+                        value: 0,
+                        onChanged: (v) {
+                          if (v == 1) addNew();
                         },
                       ),
                     ),
@@ -639,7 +642,7 @@ class _PickPersonPageState extends State<PickPersonPage> {
                               padding: const EdgeInsets.all(16),
                               child: Column(
                                 children: [
-                                  const Art('state_no_people', height: 150),
+                                  const Art('state_no_people', height: 160),
                                   const SizedBox(height: 8),
                                   Text(
                                     t('noPeopleYet'),
@@ -658,14 +661,7 @@ class _PickPersonPageState extends State<PickPersonPage> {
                               locale: widget.locale,
                               selected: p['id'] == chosen,
                               onTap: () => setState(() => chosen = p['id']),
-                              trailing: Icon(
-                                p['id'] == chosen
-                                    ? Icons.radio_button_checked
-                                    : Icons.radio_button_unchecked,
-                                color: p['id'] == chosen
-                                    ? Palette.green
-                                    : Palette.muted,
-                              ),
+                              trailing: SelectDot(selected: p['id'] == chosen),
                             ),
                         ],
                       ),

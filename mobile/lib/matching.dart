@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'api.dart';
 import 'common.dart';
@@ -130,9 +131,9 @@ class _CompareFlowState extends State<CompareFlow> {
                         color: Palette.goldSoft,
                         child: Row(
                           children: [
-                            const Icon(
+                            const Medallion(
                               Icons.person_add_alt_1_outlined,
-                              color: Palette.gold,
+                              size: 40,
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -173,13 +174,9 @@ class _CompareFlowState extends State<CompareFlow> {
                               ? candidates.remove(p['id'])
                               : candidates.add(p['id']),
                         ),
-                        trailing: Checkbox(
-                          value: candidates.contains(p['id']),
-                          onChanged: (v) => setState(
-                            () => v!
-                                ? candidates.add(p['id'])
-                                : candidates.remove(p['id']),
-                          ),
+                        trailing: SelectDot(
+                          selected: candidates.contains(p['id']),
+                          square: true,
                         ),
                       ),
                     TextButton.icon(
@@ -290,15 +287,7 @@ class FixedPersonCard extends StatelessWidget {
             ],
           ),
         ),
-        if (onEdit != null)
-          FilledButton.tonal(
-            style: FilledButton.styleFrom(
-              backgroundColor: Palette.greenSoft,
-              foregroundColor: Palette.green,
-            ),
-            onPressed: onEdit,
-            child: Text(t('edit')),
-          ),
+        if (onEdit != null) SmallButton(t('edit'), onPressed: onEdit),
       ],
     ),
   );
@@ -384,114 +373,137 @@ class _ComparisonResultsState extends State<ComparisonResults> {
     final ready = m['status'] == 'ready';
     final score = ready ? m['facts']['score']['earned'] as num : null;
     final first = rank == 1 && ready;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: AppCard(
-        color: first ? Palette.goldSoft : Palette.surface,
-        borderColor: first ? Palette.gold : Palette.border,
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => MatchDetail(
-              api: widget.api,
-              t: widget.t,
-              locale: widget.locale,
-              match: Map<String, dynamic>.from(m),
-            ),
-          ),
-        ).then((_) => poll()),
-        child: Row(
-          children: [
-            Container(
-              width: 28,
-              height: 28,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: first
-                    ? Palette.gold
-                    : ready
-                    ? const Color(0xffe9e2d3)
-                    : Colors.transparent,
+    return Reveal(
+      key: ValueKey('result-${m['id']}'),
+      delay: 90 * (rank - 1).clamp(0, 6),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: AppCard(
+          color: first ? Palette.goldSoft : Palette.surface,
+          borderColor: first ? Palette.gold : Palette.border,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => MatchDetail(
+                api: widget.api,
+                t: widget.t,
+                locale: widget.locale,
+                match: Map<String, dynamic>.from(m),
               ),
-              child: Text(
-                ready ? '$rank' : '–',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: first ? Colors.white : Palette.ink,
+            ),
+          ).then((_) => poll()),
+          child: Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: first
+                      ? const LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Color(0xfff3d78e), Color(0xffb98a32)],
+                        )
+                      : ready
+                      ? const LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Color(0xffe3d9c5), Color(0xfff5efe2)],
+                        )
+                      : null,
+                  boxShadow: first
+                      ? [
+                          BoxShadow(
+                            color: const Color(
+                              0xff8a6420,
+                            ).withValues(alpha: 0.45),
+                            offset: const Offset(0, 3),
+                            blurRadius: 6,
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Text(
+                  ready ? '$rank' : '–',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: first ? Colors.white : Palette.ink,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Avatar(
-              p2['display_name'].toString(),
-              image: p2['avatar'] as String?,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    p2['display_name'].toString(),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15.5,
-                    ),
-                  ),
-                  Text(
-                    personLine(p2, widget.t, widget.locale),
-                    style: const TextStyle(
-                      color: Palette.muted,
-                      fontSize: 12.5,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  if (ready)
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        BandChip(
-                          scoreBand(score!),
-                          t('band_${scoreBand(score)}'),
-                        ),
-                        if (tied(m))
-                          Text(
-                            t('tie'),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Palette.muted,
-                            ),
-                          ),
-                        if (pairWarnings(m['facts']['warnings']).isNotEmpty)
-                          Text(
-                            t('hasWarnings'),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Palette.muted,
-                            ),
-                          ),
-                      ],
-                    )
-                  else
+              const SizedBox(width: 12),
+              Avatar(
+                p2['display_name'].toString(),
+                image: p2['avatar'] as String?,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      m['status'] == 'failed'
-                          ? failureText(widget.t, m['failure_code'])
-                          : t(m['status']),
-                      style: const TextStyle(fontSize: 12.5),
+                      p2['display_name'].toString(),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15.5,
+                      ),
                     ),
-                ],
+                    Text(
+                      personLine(p2, widget.t, widget.locale),
+                      style: const TextStyle(
+                        color: Palette.muted,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    if (ready)
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          BandChip(
+                            scoreBand(score!),
+                            t('band_${scoreBand(score)}'),
+                          ),
+                          if (tied(m))
+                            Text(
+                              t('tie'),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Palette.muted,
+                              ),
+                            ),
+                          if (pairWarnings(m['facts']['warnings']).isNotEmpty)
+                            Text(
+                              t('hasWarnings'),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Palette.muted,
+                              ),
+                            ),
+                        ],
+                      )
+                    else
+                      Text(
+                        m['status'] == 'failed'
+                            ? failureText(widget.t, m['failure_code'])
+                            : t(m['status']),
+                        style: const TextStyle(fontSize: 12.5),
+                      ),
+                  ],
+                ),
               ),
-            ),
-            if (ready)
-              Text(
-                '${points(score!)}/36',
-                style: heading(17, color: Palette.green),
-              ),
-            const Icon(Icons.chevron_right, color: Palette.muted),
-          ],
+              if (ready)
+                Text(
+                  '${points(score!)}/36',
+                  style: heading(17, color: Palette.green),
+                ),
+              const Icon(Icons.chevron_right, color: Palette.muted),
+            ],
+          ),
         ),
       ),
     );
@@ -712,68 +724,59 @@ class _MatchDetailState extends State<MatchDetail> {
       children: [
         Avatar(
           p['display_name'].toString(),
-          size: 60,
+          size: 68,
           image: p['avatar'] as String?,
         ),
-        const SizedBox(height: 6),
-        Text(
-          firstName(p['display_name']),
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
+        const SizedBox(height: 7),
+        Text(firstName(p['display_name']), style: heading(15)),
       ],
     );
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         one(people[0]),
-        const Padding(
-          padding: EdgeInsets.fromLTRB(22, 0, 22, 22),
-          child: Icon(Icons.favorite, color: Color(0xffe05a4f), size: 26),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(22, 0, 22, 24),
+          child: Ambient(
+            period: const Duration(milliseconds: 1500),
+            reverse: true,
+            builder: (_, v) => Transform.scale(
+              scale: 1 + 0.12 * Curves.easeInOut.transform(v),
+              child: const Icon(
+                Icons.favorite,
+                color: Color(0xffe05a4f),
+                size: 28,
+                shadows: [
+                  Shadow(
+                    color: Color(0x66a02a20),
+                    offset: Offset(0, 3),
+                    blurRadius: 6,
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
         one(people[1]),
       ],
     );
   }
 
-  Widget tabs() {
-    final labels = ['tabSummary', 'tabGuna', 'tabDoshas', 'tabRemedies'];
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: const Color(0xffefe7d8),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          for (final (i, key) in labels.indexed)
-            Expanded(
-              child: GestureDetector(
-                onTap: () => setState(() => tab = i),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(vertical: 9),
-                  decoration: BoxDecoration(
-                    color: tab == i ? Palette.green : Colors.transparent,
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: Text(
-                    t(key),
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                      color: tab == i ? Colors.white : Palette.ink,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
+  Widget tabs() => PillSwitch<int>(
+    height: 44,
+    fontSize: 12.5,
+    value: tab,
+    onChanged: (v) => setState(() => tab = v),
+    options: [
+      for (final (i, key) in const [
+        'tabSummary',
+        'tabGuna',
+        'tabDoshas',
+        'tabRemedies',
+      ].indexed)
+        (i, t(key)),
+    ],
+  );
 
   Widget listCard(String title, IconData icon, Color colour, List items) =>
       Padding(
@@ -784,11 +787,7 @@ class _MatchDetailState extends State<MatchDetail> {
             children: [
               Row(
                 children: [
-                  CircleAvatar(
-                    radius: 14,
-                    backgroundColor: colour.withValues(alpha: 0.15),
-                    child: Icon(icon, size: 17, color: colour),
-                  ),
+                  Medallion(icon, size: 34),
                   const SizedBox(width: 10),
                   Text(title, style: heading(16)),
                 ],
@@ -837,19 +836,30 @@ class _MatchDetailState extends State<MatchDetail> {
         const SizedBox(height: 12),
         Center(
           child: SizedBox(
-            width: 230,
+            width: 280,
+            height: 270,
             child: Stack(
               alignment: Alignment.center,
+              clipBehavior: Clip.none,
               children: [
-                const Opacity(
-                  opacity: 0.35,
-                  child: Art('zodiac_wheel', width: 210, height: 210),
+                Ambient(
+                  period: const Duration(seconds: 120),
+                  builder: (_, v) => Transform.rotate(
+                    angle: 2 * math.pi * v,
+                    child: const Opacity(
+                      opacity: 0.3,
+                      child: Art('zodiac_wheel', width: 268, height: 268),
+                    ),
+                  ),
                 ),
                 ScoreRing(score: score, caption: t('outOf36')),
                 const Positioned(
-                  right: -6,
-                  top: 6,
-                  child: Art('lotus', width: 48, height: 48),
+                  right: 4,
+                  top: 4,
+                  child: Reveal(
+                    delay: 700,
+                    child: Art('lotus', width: 62, height: 62),
+                  ),
                 ),
               ],
             ),
@@ -897,17 +907,29 @@ class _MatchDetailState extends State<MatchDetail> {
         else if (summary == null)
           Column(
             children: [
-              const Art('state_no_data', height: 120),
+              const Art('state_no_data', height: 130),
               Text(summaryError ?? t('error')),
               TextButton(onPressed: load, child: Text(t('retry'))),
             ],
           )
         else ...[
-          Text(summary!['headline'], style: heading(16, color: Palette.green)),
-          const SizedBox(height: 6),
-          Text(
-            summary!['overview'],
-            style: const TextStyle(height: 1.55, color: Palette.ink),
+          Reveal(
+            child: AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    summary!['headline'],
+                    style: heading(17, color: Palette.greenDark),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    summary!['overview'],
+                    style: const TextStyle(height: 1.55, color: Palette.ink),
+                  ),
+                ],
+              ),
+            ),
           ),
           if ((summary!['strengths'] as List).isNotEmpty)
             listCard(
@@ -1030,7 +1052,7 @@ class _MatchDetailState extends State<MatchDetail> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: 12),
-        const Art('sun_moon', height: 110),
+        const Reveal(child: Art('sun_moon', height: 130)),
         const SizedBox(height: 12),
         for (final d in ['nadi', 'bhakoot', 'gana'])
           if (rows.containsKey(d))
@@ -1082,7 +1104,7 @@ class _MatchDetailState extends State<MatchDetail> {
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       const SizedBox(height: 12),
-      const Art('vedic_still_life', height: 130),
+      const Reveal(child: Art('vedic_still_life', height: 150)),
       const SizedBox(height: 12),
       if (summary != null)
         AppCard(
@@ -1123,10 +1145,13 @@ class _MatchDetailState extends State<MatchDetail> {
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
       child: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/images/report_card.jpg'),
+        decoration: BoxDecoration(
+          border: Border.all(color: const Color(0x88e9c877)),
+          borderRadius: BorderRadius.circular(18),
+          image: const DecorationImage(
+            image: AssetImage('assets/images/night.webp'),
             fit: BoxFit.cover,
+            filterQuality: FilterQuality.high,
           ),
         ),
         child: Container(
@@ -1136,16 +1161,18 @@ class _MatchDetailState extends State<MatchDetail> {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
+              stops: const [0, 0.45, 1],
               colors: [
-                Colors.black.withValues(alpha: 0.35),
-                const Color(0xff10241a).withValues(alpha: 0.88),
+                Colors.black.withValues(alpha: 0.05),
+                const Color(0xff07140e).withValues(alpha: 0.55),
+                const Color(0xff07140e).withValues(alpha: 0.9),
               ],
             ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 40),
+              const SizedBox(height: 74),
               Text(t('fullReport'), style: heading(19, color: Colors.white)),
               const SizedBox(height: 6),
               Text(t('fullReportBody'), style: light),
@@ -1208,23 +1235,23 @@ class _MatchDetailState extends State<MatchDetail> {
         title: Text(t('detailedReport')),
         actions: [
           if (facts != null)
-            IconButton(
-              tooltip: t('download'),
-              icon: const Icon(Icons.file_download_outlined),
-              onPressed: report?['status'] == 'ready'
-                  ? download
-                  : generateReport,
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Center(
+                child: RoundIconButton(
+                  icon: Icons.file_download_outlined,
+                  tooltip: t('download'),
+                  onPressed: report?['status'] == 'ready'
+                      ? download
+                      : generateReport,
+                ),
+              ),
             ),
         ],
       ),
       body: Stack(
         children: [
-          const Positioned.fill(
-            child: Opacity(
-              opacity: 0.22,
-              child: Art('zodiac_pattern', fit: BoxFit.cover, on: null),
-            ),
-          ),
+          const Positioned.fill(child: PaperBackground()),
           Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 560),
@@ -1237,12 +1264,23 @@ class _MatchDetailState extends State<MatchDetail> {
                   if (error != null) Text(error!),
                   if (facts != null) ...[
                     tabs(),
-                    [
-                      summaryTab(facts),
-                      gunaTab(facts),
-                      doshaTab(facts),
-                      remediesTab(),
-                    ][tab],
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 260),
+                      switchInCurve: Curves.easeOutCubic,
+                      layoutBuilder: (current, previous) => Stack(
+                        alignment: Alignment.topCenter,
+                        children: [...previous, ?current],
+                      ),
+                      child: KeyedSubtree(
+                        key: ValueKey(tab),
+                        child: [
+                          summaryTab(facts),
+                          gunaTab(facts),
+                          doshaTab(facts),
+                          remediesTab(),
+                        ][tab],
+                      ),
+                    ),
                     const SizedBox(height: 20),
                     reportSection(),
                   ] else ...[
@@ -1254,7 +1292,7 @@ class _MatchDetailState extends State<MatchDetail> {
                         color: Palette.gold,
                       )
                     else
-                      const Art('state_processing', height: 150),
+                      const Art('state_processing', height: 170),
                     const SizedBox(height: 16),
                     Text(
                       match['status'] == 'failed'

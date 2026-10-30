@@ -121,7 +121,7 @@ class PersonRow extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
+    padding: const EdgeInsets.only(bottom: 10),
     child: AppCard(
       onTap: onTap,
       color: selected ? Palette.goldSoft : Palette.surface,
@@ -165,6 +165,7 @@ class ReportRow extends StatelessWidget {
   final List names;
   final num? score;
   final String subtitle;
+  final String? image;
   final Translate t;
   final Widget? trailing;
   final VoidCallback? onTap;
@@ -174,18 +175,23 @@ class ReportRow extends StatelessWidget {
     required this.score,
     required this.subtitle,
     required this.t,
+    this.image,
     this.trailing,
     this.onTap,
   });
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
+    padding: const EdgeInsets.only(bottom: 10),
     child: AppCard(
       onTap: onTap,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(
         children: [
-          Avatar(names.isEmpty ? '?' : names.last.toString(), size: 42),
+          Avatar(
+            names.isEmpty ? '?' : names.last.toString(),
+            size: 46,
+            image: image,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -209,7 +215,7 @@ class ReportRow extends StatelessWidget {
               children: [
                 Text(
                   '${points(score!)}/36',
-                  style: const TextStyle(fontWeight: FontWeight.w700),
+                  style: heading(15, color: Palette.greenDark),
                 ),
                 const SizedBox(height: 4),
                 BandChip(scoreBand(score!), t('band_${scoreBand(score!)}')),

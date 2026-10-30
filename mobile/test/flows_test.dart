@@ -194,6 +194,7 @@ VoidCallback? actionOf(WidgetTester tester, String label) => tester
     .onPressed;
 
 void main() {
+  Motion.ambient = false;
   // Cached asset futures are bound to the previous test's fake-async zone.
   setUp(() => rootBundle.clear());
   testWidgets(
@@ -386,7 +387,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Methodology & privacy'), findsNothing);
       expect(find.text('सेटिंग्स'), findsWidgets);
-      expect(find.byType(SegmentedButton<String>), findsOneWidget);
+      expect(find.byType(PillSwitch<String>), findsOneWidget);
       expect((await SharedPreferences.getInstance()).getString('locale'), 'hi');
     },
   );

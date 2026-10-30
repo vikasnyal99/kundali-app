@@ -518,3 +518,38 @@ logged in): `git pull`, `SITE=kundaliapi.zivantaai.com bash infra/server-deploy.
 worker restarted, Caddy route active; session closed with `exit`. Live checks: artwork (`splash_en.jpg`,
 `home_banner.jpg`, `avatar_male_1.jpg`) and favicon served; a person saved with `avatar: male_1` keeps it; full
 `api_smoke.sh` passed (throwaway guests deleted).
+
+## 17. HD art, 3D controls and motion (2026-10-31)
+
+**Why:** the asset pack's PNGs were upscales of tiny crops (the splash source is only a few hundred pixels wide), and
+art on white was drawn with a multiply blend, which left visible squares and clipped wheels over patterned pages.
+
+**Artwork:** 7 new text-free images generated in the owner's ChatGPT through Chrome, kept in
+`~/Downloads/KundliMilan_HD_Art/` (previews of every screen in `preview/`). `mobile/tool/prepare_assets.py` replaces
+`prepare_assets.sh`: true-alpha cut-outs, sheet splitting, WebP output (22 images, 1.76 MB, loaded per screen), and Android,
+iOS and web icons. Wordmark and tagline are now live text in the bundled serif, so they stay sharp. Portraits grew to
+six (`female_1-3`, `male_1-3`; `schemas.py` accepts the same set; existing choices keep their names but get the new art).
+
+**Controls (`mobile/lib/ui.dart`):** `PrimaryButton` (emerald, gold, ivory: metal rim, shaded body, gloss, solid lip, cast
+shadows, sinks when pressed; optional light sweep), `SmallButton`, `RoundIconButton`, raised `AppCard`, `Medallion`, sliding
+`PillSwitch` (replaces segmented buttons and report tabs), `SelectDot`, `KundliNavBar`.
+
+**Motion:** soft page transitions, staggered `Reveal`, score ring sweep with count-up and a tick per guna, slowly turning
+mandala and zodiac wheel, slow zoom on paintings, drifting light on the opening scene, beating heart, tab cross-fades.
+Looping motion goes through `Ambient` and stops for reduced-motion users; tests set `Motion.ambient = false`, or
+`pumpAndSettle` never settles.
+
+**Fonts:** Roboto and Noto Sans Devanagari subsets are bundled, so button labels use real weights instead of synthetic bold.
+
+**Other fixes:** home painting runs edge to edge and melts into the page; report rows show the saved portrait; `index.html`
+has a cream `theme-color` and a boot icon until Flutter's first frame. PDF report recoloured to the app's green and gold, and
+its footer no longer collides with the page frame.
+
+**Verification:** `flutter analyze` clean, `flutter test` 15 passed (new: every theme font is declared in `pubspec.yaml`,
+after a bad edit dropped the serif from the manifest and only the browser showed it), backend `pytest` 63 passed, 7 skipped.
+All screens checked at 390x844 @2x with sample data, in English and on the Hindi language screen. In Chrome against a local
+server: language screen and home with the correct fonts and animation. Not seen in a browser or on a phone: report, people
+and form screens (rendered only in the Flutter test harness). `flutter build ios` needs a Mac.
+
+**APK:** `mobile/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk` (18.9 MB), needed once for the new native splash and
+launcher icon.

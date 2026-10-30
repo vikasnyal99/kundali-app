@@ -105,8 +105,7 @@ class _KundliAppState extends State<KundliApp> {
   );
 }
 
-/// First screen: the asset pack's splash artwork for the current language (its wordmark and tagline
-/// are part of the image) with real buttons over the river; choosing a language enters the app.
+/// First screen: the opening scene with two raised language buttons; choosing one enters the app.
 class LanguageScreen extends StatelessWidget {
   final Translate t;
   final String locale;
@@ -117,95 +116,61 @@ class LanguageScreen extends StatelessWidget {
     required this.locale,
     required this.onChoose,
   });
-  Widget choice(String code, String label) {
-    final active = code == locale;
-    return SizedBox(
-      width: double.infinity,
-      height: 54,
-      child: active
-          ? PrimaryButton(label, arrow: false, onPressed: () => onChoose(code))
-          : OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                backgroundColor: Palette.surface.withValues(alpha: 0.94),
-                side: const BorderSide(color: Palette.border),
-                shape: const StadiumBorder(),
-              ),
-              onPressed: () => onChoose(code),
-              child: Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
-                  color: Palette.ink,
-                ),
-              ),
-            ),
-    );
-  }
+  Widget choice(String code, String label) => PrimaryButton(
+    label,
+    arrow: false,
+    ivory: code != locale,
+    shine: code == locale,
+    onPressed: () => onChoose(code),
+  );
 
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: Palette.background,
-    body: LayoutBuilder(
-      builder: (context, size) {
-        // Keep the portrait artwork whole: never wider than its own proportions at this height,
-        // so the buttons can sit just below the artwork's tagline (which ends about 59% down).
-        final width = [
-          480.0,
-          size.maxHeight * 1074 / 1920,
-          size.maxWidth,
-        ].reduce((a, b) => a < b ? a : b);
-        return Center(
-          child: SizedBox(
-            width: width,
-            height: size.maxHeight,
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 350),
-                    child: Image.asset(
-                      'assets/images/splash_$locale.jpg',
-                      key: ValueKey(locale),
-                      width: width,
-                      height: size.maxHeight,
-                      fit: BoxFit.cover,
-                      alignment: Alignment.topCenter,
-                    ),
-                  ),
-                ),
-                Positioned(
-                  left: width * 0.11,
-                  right: width * 0.11,
-                  top: size.maxHeight * 0.62,
-                  child: Column(
-                    children: [
-                      choice('en', 'English'),
-                      const SizedBox(height: 12),
-                      choice('hi', 'हिंदी'),
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Palette.surface.withValues(alpha: 0.85),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          t('footerValues'),
-                          style: const TextStyle(color: Color(0xff8a6a3a)),
+    body: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: BrandScene(
+          name: t('appName'),
+          tagline: t('appTagline'),
+          below: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: Column(
+                children: [
+                  Reveal(delay: 460, child: choice('en', 'English')),
+                  const SizedBox(height: 16),
+                  Reveal(delay: 580, child: choice('hi', 'हिंदी')),
+                  const SizedBox(height: 18),
+                  Reveal(
+                    delay: 720,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xff10301f).withValues(alpha: 0.62),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0x66f3d78e)),
+                      ),
+                      child: Text(
+                        t('footerValues'),
+                        style: const TextStyle(
+                          color: Color(0xfff8e8c0),
+                          fontSize: 13,
+                          letterSpacing: 0.3,
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 18),
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     ),
   );
 }
@@ -237,6 +202,17 @@ class _ShellState extends State<Shell> {
   void initState() {
     super.initState();
     start();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Decode the next screens' artwork early so they appear complete.
+    if (Motion.ambient) {
+      for (final name in ['home_hero', 'zodiac_wheel', 'lotus', 'night']) {
+        precacheImage(AssetImage('assets/images/$name.webp'), context);
+      }
+    }
   }
 
   Future<void> start() async {
@@ -393,121 +369,208 @@ class _ShellState extends State<Shell> {
         : t(r['status']),
   ].join(' · ');
 
+  /// The portrait of a report's second person, when that person is still saved with one.
+  String? reportImage(Map r) {
+    final names = r['people'] as List? ?? [];
+    if (names.isEmpty) return null;
+    for (final p in people) {
+      if (p['display_name'] == names.last) return p['avatar'] as String?;
+    }
+    return null;
+  }
+
   Widget tile(IconData icon, String label, VoidCallback onTap) => Expanded(
     child: AppCard(
       onTap: onTap,
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 6),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
       child: Column(
         children: [
-          Icon(icon, color: Palette.gold, size: 28),
-          const SizedBox(height: 8),
+          Medallion(icon),
+          const SizedBox(height: 9),
           Text(
             label,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 12.5, height: 1.25),
+            style: const TextStyle(
+              fontSize: 12.5,
+              height: 1.25,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
     ),
   );
 
-  Widget home() => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: Container(
-          color: const Color(0xfff7efe2),
-          child: Column(
-            children: [
-              const SizedBox(
-                height: 170,
-                width: double.infinity,
-                child: Art(
-                  'home_banner',
+  /// Edge-to-edge painting that melts into the page, with the headline resting on its misty water.
+  Widget hero() => SizedBox(
+    height: 408,
+    child: Stack(
+      children: [
+        Positioned(
+          left: 0,
+          right: 0,
+          top: 0,
+          height: 300,
+          child: ClipRect(
+            child: Ambient(
+              period: const Duration(seconds: 24),
+              reverse: true,
+              builder: (_, v) => Transform.scale(
+                scale: 1.01 + 0.05 * Curves.easeInOut.transform(v),
+                child: const Art(
+                  'home_hero',
                   fit: BoxFit.cover,
-                  alignment: Alignment(0, -0.2),
-                  on: null,
+                  alignment: Alignment(0, -0.35),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 6, 20, 20),
-                child: Column(
-                  children: [
-                    Text(
-                      t('discover'),
-                      textAlign: TextAlign.center,
-                      style: heading(27),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      t('discoverBody'),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Palette.muted, height: 1.4),
-                    ),
-                    const SizedBox(height: 16),
-                    PrimaryButton(t('match'), onPressed: startMatch),
-                  ],
+            ),
+          ),
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          top: 0,
+          height: 301,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                stops: const [0, 0.5, 0.74, 1],
+                colors: [
+                  Palette.background.withValues(alpha: 0),
+                  Palette.background.withValues(alpha: 0),
+                  Palette.background.withValues(alpha: 0.82),
+                  Palette.background,
+                ],
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          left: 22,
+          right: 22,
+          bottom: 8,
+          child: Column(
+            children: [
+              Reveal(
+                delay: 80,
+                child: Text(
+                  t('discover'),
+                  textAlign: TextAlign.center,
+                  style: heading(
+                    30,
+                    shadows: const [
+                      Shadow(color: Color(0xccfffaf0), blurRadius: 12),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Reveal(
+                delay: 170,
+                child: Text(
+                  t('discoverBody'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Palette.muted, height: 1.4),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Reveal(
+                delay: 260,
+                child: PrimaryButton(
+                  t('match'),
+                  shine: true,
+                  onPressed: startMatch,
                 ),
               ),
             ],
           ),
         ),
-      ),
-      const SizedBox(height: 14),
-      Row(
-        children: [
-          tile(
-            Icons.diversity_3_outlined,
-            t('compareShort'),
-            () => open(
-              CompareFlow(api: widget.api, t: widget.t, locale: widget.locale),
+      ],
+    ),
+  );
+
+  Widget home() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      hero(),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Reveal(
+              delay: 340,
+              child: Row(
+                children: [
+                  tile(
+                    Icons.diversity_3_outlined,
+                    t('compareShort'),
+                    () => open(
+                      CompareFlow(
+                        api: widget.api,
+                        t: widget.t,
+                        locale: widget.locale,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  tile(
+                    Icons.person_outline,
+                    t('savedShort'),
+                    () => setState(() => tab = 1),
+                  ),
+                  const SizedBox(width: 10),
+                  tile(
+                    Icons.description_outlined,
+                    t('previousReports'),
+                    () => setState(() => tab = 2),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 10),
-          tile(
-            Icons.person_outline,
-            t('savedShort'),
-            () => setState(() => tab = 1),
-          ),
-          const SizedBox(width: 10),
-          tile(
-            Icons.description_outlined,
-            t('previousReports'),
-            () => setState(() => tab = 2),
-          ),
-        ],
-      ),
-      const SizedBox(height: 22),
-      Row(
-        children: [
-          Expanded(child: Text(t('recentReports'), style: heading(17))),
-          TextButton(
-            onPressed: () => setState(() => tab = 2),
-            child: Text(t('viewAll')),
-          ),
-        ],
-      ),
-      if (reports.isEmpty)
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Text(
-            t('emptyReports'),
-            style: const TextStyle(color: Palette.muted),
-          ),
+            const SizedBox(height: 22),
+            Row(
+              children: [
+                Expanded(child: Text(t('recentReports'), style: heading(18))),
+                TextButton(
+                  onPressed: () => setState(() => tab = 2),
+                  child: Text(t('viewAll')),
+                ),
+              ],
+            ),
+            if (reports.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  t('emptyReports'),
+                  style: const TextStyle(color: Palette.muted),
+                ),
+              ),
+            for (final (i, r) in reports.reversed.take(3).indexed)
+              Reveal(
+                delay: 420 + 70 * i,
+                child: ReportRow(
+                  names: r['people'] ?? [],
+                  score: r['score'],
+                  subtitle: reportSubtitle(r),
+                  image: reportImage(r),
+                  t: widget.t,
+                  onTap: () => openReport(r),
+                ),
+              ),
+            const SizedBox(height: 16),
+            Text(
+              t('disclaimer'),
+              style: const TextStyle(
+                fontSize: 12,
+                color: Palette.muted,
+                height: 1.5,
+              ),
+            ),
+          ],
         ),
-      for (final r in reports.reversed.take(3))
-        ReportRow(
-          names: r['people'] ?? [],
-          score: r['score'],
-          subtitle: reportSubtitle(r),
-          t: widget.t,
-          onTap: () => openReport(r),
-        ),
-      const SizedBox(height: 16),
-      Text(
-        t('disclaimer'),
-        style: const TextStyle(fontSize: 12, color: Palette.muted, height: 1.5),
       ),
     ],
   );
@@ -534,7 +597,7 @@ class _ShellState extends State<Shell> {
             padding: const EdgeInsets.symmetric(vertical: 40),
             child: Column(
               children: [
-                const Art('state_no_people', height: 170),
+                const Art('state_no_people', height: 180),
                 const SizedBox(height: 12),
                 Text(t('emptyPeople'), style: heading(19)),
                 const SizedBox(height: 8),
@@ -542,28 +605,40 @@ class _ShellState extends State<Shell> {
               ],
             ),
           ),
-        for (final p in people.where(
-          (p) =>
-              p['display_name'].toString().toLowerCase().contains(q) ||
-              p['birth_place_name'].toString().toLowerCase().contains(q),
-        ))
-          PersonRow(
-            person: p,
-            t: widget.t,
-            locale: widget.locale,
-            withTime: true,
-            onTap: () => editor(Map<String, dynamic>.from(p)),
-            trailing: IconButton(
-              tooltip: t('delete'),
-              icon: const Icon(Icons.delete_outline, color: Palette.muted),
-              onPressed: () async {
-                if (await confirm(t('confirmDelete'))) {
-                  await task(() async {
-                    await widget.api.request('DELETE', '/v1/people/${p['id']}');
-                    await reload();
-                  });
-                }
-              },
+        for (final (i, p)
+            in people
+                .where(
+                  (p) =>
+                      p['display_name'].toString().toLowerCase().contains(q) ||
+                      p['birth_place_name'].toString().toLowerCase().contains(
+                        q,
+                      ),
+                )
+                .indexed)
+          Reveal(
+            key: ValueKey('person-${p['id']}'),
+            delay: 50 * i.clamp(0, 6),
+            child: PersonRow(
+              person: p,
+              t: widget.t,
+              locale: widget.locale,
+              withTime: true,
+              onTap: () => editor(Map<String, dynamic>.from(p)),
+              trailing: IconButton(
+                tooltip: t('delete'),
+                icon: const Icon(Icons.delete_outline, color: Palette.muted),
+                onPressed: () async {
+                  if (await confirm(t('confirmDelete'))) {
+                    await task(() async {
+                      await widget.api.request(
+                        'DELETE',
+                        '/v1/people/${p['id']}',
+                      );
+                      await reload();
+                    });
+                  }
+                },
+              ),
             ),
           ),
       ],
@@ -578,7 +653,7 @@ class _ShellState extends State<Shell> {
           padding: const EdgeInsets.symmetric(vertical: 30),
           child: Column(
             children: [
-              const Art('state_no_reports', height: 170),
+              const Art('state_no_reports', height: 180),
               const SizedBox(height: 12),
               Text(t('emptyReports'), textAlign: TextAlign.center),
             ],
@@ -589,6 +664,7 @@ class _ShellState extends State<Shell> {
           names: r['people'] ?? [],
           score: r['score'],
           subtitle: reportSubtitle(r),
+          image: reportImage(r),
           t: widget.t,
           onTap: () => openReport(r),
           trailing: IconButton(
@@ -622,13 +698,29 @@ class _ShellState extends State<Shell> {
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       ClipRRect(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         child: SizedBox(
-          height: 130,
+          height: 150,
           child: Stack(
             fit: StackFit.expand,
             children: [
-              const Art('settings_banner', fit: BoxFit.cover, on: null),
+              const Art(
+                'night',
+                fit: BoxFit.cover,
+                alignment: Alignment(0, -0.1),
+              ),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomLeft,
+                    end: Alignment.topRight,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.55),
+                      Colors.black.withValues(alpha: 0),
+                    ],
+                  ),
+                ),
+              ),
               Padding(
                 padding: const EdgeInsets.all(18),
                 child: Column(
@@ -654,14 +746,10 @@ class _ShellState extends State<Shell> {
           children: [
             Text(t('chooseLanguage'), style: heading(17)),
             const SizedBox(height: 12),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'en', label: Text('English')),
-                ButtonSegment(value: 'hi', label: Text('हिन्दी')),
-              ],
-              selected: {widget.locale},
-              showSelectedIcon: false,
-              onSelectionChanged: (v) => widget.onLanguage(v.first),
+            PillSwitch<String>(
+              options: const [('en', 'English'), ('hi', 'हिन्दी')],
+              value: widget.locale,
+              onChanged: widget.onLanguage,
             ),
           ],
         ),
@@ -687,13 +775,12 @@ class _ShellState extends State<Shell> {
         ),
       ),
       const SizedBox(height: 14),
-      OutlinedButton.icon(
-        style: OutlinedButton.styleFrom(
-          shape: const StadiumBorder(),
-          minimumSize: const Size.fromHeight(48),
-        ),
-        icon: const Icon(Icons.file_download_outlined),
-        label: Text(t('export')),
+      PrimaryButton(
+        t('export'),
+        ivory: true,
+        arrow: false,
+        height: 50,
+        icon: Icons.file_download_outlined,
         onPressed: () => task(() async {
           final data = await widget.api.request('GET', '/v1/me/export');
           if (!mounted) return;
@@ -716,6 +803,7 @@ class _ShellState extends State<Shell> {
           );
         }),
       ),
+      const SizedBox(height: 8),
       TextButton(
         onPressed: () async {
           if (await confirm(t('eraseConfirm'))) {
@@ -732,43 +820,54 @@ class _ShellState extends State<Shell> {
     ],
   );
 
+  Widget brandTitle() => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      const Art('mandala', width: 30, height: 30),
+      const SizedBox(width: 9),
+      Text(t('appName'), style: heading(23, color: Palette.greenDeep)),
+    ],
+  );
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: Text(
-        tab == 0
-            ? t('appName')
-            : t(['home', 'peopleTab', 'reports', 'settings'][tab]),
-        style: heading(
-          tab == 0 ? 22 : 19,
-          color: tab == 0 ? Palette.green : Palette.ink,
-        ),
-      ),
+      title: tab == 0
+          ? brandTitle()
+          : Text(t(['home', 'peopleTab', 'reports', 'settings'][tab])),
       actions: [
-        IconButton(
-          tooltip: t('refresh'),
-          onPressed: busy ? null : () => task(reload),
-          icon: const Icon(Icons.refresh),
+        Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: Center(
+            child: RoundIconButton(
+              icon: Icons.refresh_rounded,
+              tooltip: t('refresh'),
+              onPressed: busy ? null : () => task(reload),
+            ),
+          ),
         ),
       ],
     ),
     body: SafeArea(
+      bottom: false,
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
           child: RefreshIndicator(
             onRefresh: () => task(reload),
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+              padding: tab == 0
+                  ? const EdgeInsets.only(bottom: 24)
+                  : const EdgeInsets.fromLTRB(16, 4, 16, 24),
               children: [
                 if (busy)
                   const Padding(
                     padding: EdgeInsets.only(bottom: 8),
-                    child: LinearProgressIndicator(),
+                    child: LinearProgressIndicator(minHeight: 2.5),
                   ),
                 if (error != null)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(12),
                     child: AppCard(
                       color: Theme.of(context).colorScheme.errorContainer,
                       child: Column(
@@ -779,37 +878,32 @@ class _ShellState extends State<Shell> {
                       ),
                     ),
                   ),
-                [home, peoplePage, reportPage, settingsPage][tab](),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 260),
+                  switchInCurve: Curves.easeOutCubic,
+                  layoutBuilder: (current, previous) => Stack(
+                    alignment: Alignment.topCenter,
+                    children: [...previous, ?current],
+                  ),
+                  child: KeyedSubtree(
+                    key: ValueKey(tab),
+                    child: [home, peoplePage, reportPage, settingsPage][tab](),
+                  ),
+                ),
               ],
             ),
           ),
         ),
       ),
     ),
-    bottomNavigationBar: NavigationBar(
-      selectedIndex: tab,
-      onDestinationSelected: (v) => setState(() => tab = v),
-      destinations: [
-        NavigationDestination(
-          icon: const Icon(Icons.home_outlined),
-          selectedIcon: const Icon(Icons.home),
-          label: t('home'),
-        ),
-        NavigationDestination(
-          icon: const Icon(Icons.people_outline),
-          selectedIcon: const Icon(Icons.people),
-          label: t('peopleTab'),
-        ),
-        NavigationDestination(
-          icon: const Icon(Icons.description_outlined),
-          selectedIcon: const Icon(Icons.description),
-          label: t('reports'),
-        ),
-        NavigationDestination(
-          icon: const Icon(Icons.settings_outlined),
-          selectedIcon: const Icon(Icons.settings),
-          label: t('settings'),
-        ),
+    bottomNavigationBar: KundliNavBar(
+      index: tab,
+      onTap: (v) => setState(() => tab = v),
+      items: [
+        (Icons.home_outlined, Icons.home_rounded, t('home')),
+        (Icons.people_outline, Icons.people, t('peopleTab')),
+        (Icons.description_outlined, Icons.description, t('reports')),
+        (Icons.settings_outlined, Icons.settings, t('settings')),
       ],
     ),
   );

@@ -26,6 +26,20 @@ flutter:
     - lib/l10n/app_hi.arb
     - assets/images/
   fonts:
+    - family: KundliSans
+      fonts:
+        - asset: assets/fonts/Roboto-Regular-subset.ttf
+          weight: 400
+        - asset: assets/fonts/Roboto-Medium-subset.ttf
+          weight: 500
+        - asset: assets/fonts/Roboto-Bold-subset.ttf
+          weight: 700
+    - family: KundliSansDeva
+      fonts:
+        - asset: assets/fonts/NotoSansDevanagari-Regular-subset.ttf
+          weight: 400
+        - asset: assets/fonts/NotoSansDevanagari-SemiBold-subset.ttf
+          weight: 600
     - family: KundliSerif
       fonts:
         - asset: assets/fonts/NotoSerif-SemiBold-subset.ttf

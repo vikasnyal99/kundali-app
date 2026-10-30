@@ -2,8 +2,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kundli_milan/shell.dart';
+import 'package:kundli_milan/theme.dart';
 
 void main() {
+  Motion.ambient = false;
   final home = Uri.parse('https://kundaliapi.zivantaai.com/');
 
   test('app pages stay in the WebView; signed PDF links leave it', () {
@@ -52,7 +54,7 @@ void main() {
     },
   );
 
-  testWidgets('splash shows the artwork for the remembered language', (
+  testWidgets('splash shows the scene in the remembered language', (
     tester,
   ) async {
     final controller = AnimationController(
@@ -66,11 +68,16 @@ void main() {
     );
     controller.value = 1;
     await tester.pump();
-    final image = tester.widget<Image>(find.byType(Image));
     expect(
-      (image.image as AssetImage).assetName,
-      'assets/images/splash_hi.jpg',
+      tester
+          .widgetList<Image>(find.byType(Image))
+          .map((i) => (i.image as AssetImage).assetName),
+      containsAll([
+        'assets/images/splash_bg.webp',
+        'assets/images/mandala.webp',
+      ]),
     );
+    expect(find.text('कुंडलीमिलान'), findsOneWidget);
     expect(find.byType(LinearProgressIndicator), findsOneWidget);
     controller.dispose();
   });

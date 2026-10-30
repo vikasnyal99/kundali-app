@@ -22,17 +22,26 @@
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#f7f1e6">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="apple-mobile-web-app-title" content="KundliMilan">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
   <title>KundliMilan</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    html, body { margin: 0; height: 100%; background: #f7f1e6; }
+    #boot { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+    #boot img { width: 96px; height: 96px; border-radius: 22px; box-shadow: 0 12px 30px rgba(35, 70, 48, .35); animation: boot 1.6s ease-in-out infinite; }
+    @keyframes boot { 50% { transform: scale(1.06); } }
+  </style>
 </head>
 <body>
+  <div id="boot"><img src="icons/Icon-192.png" alt=""></div>
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader
@@ -41,6 +50,7 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
+  <script>window.addEventListener('flutter-first-frame', function () { var b = document.getElementById('boot'); if (b) b.remove(); });</script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

@@ -16,7 +16,7 @@ class PersonInput(BaseModel):
     time_accuracy: Literal['exact','approximate','unknown'] = 'exact'
     fold: Literal[0,1] | None = None
     # Optional portrait from the app's asset set; display only, never used in calculations.
-    avatar: Literal['female_1','male_1','male_2'] | None = None
+    avatar: Literal['female_1','female_2','female_3','male_1','male_2','male_3'] | None = None
     @model_validator(mode='after')
     def validate_birth(self):
         self.display_name = self.display_name.strip()

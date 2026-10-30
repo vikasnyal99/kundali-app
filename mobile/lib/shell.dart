@@ -223,7 +223,7 @@ class _ShellScreenState extends State<ShellScreen>
   }
 }
 
-/// The asset pack's splash artwork (wordmark and tagline included) fading in with a slow, gentle zoom.
+/// The opening scene (same as the web app's language screen) fading in, in the remembered language.
 class Splash extends StatelessWidget {
   final Animation<double> intro;
   final bool waiting;
@@ -239,38 +239,27 @@ class Splash extends StatelessWidget {
     color: cream,
     child: AnimatedBuilder(
       animation: intro,
-      builder: (context, _) {
-        final t = Curves.easeOut.transform(intro.value);
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            Opacity(
-              opacity: (intro.value / 0.4).clamp(0.0, 1.0),
-              child: Transform.scale(
-                scale: 1.08 - 0.08 * t,
-                child: Image.asset(
-                  'assets/images/splash_$locale.jpg',
-                  fit: BoxFit.cover,
-                  alignment: Alignment.topCenter,
-                ),
-              ),
-            ),
-            Align(
-              alignment: const Alignment(0, 0.62),
-              child: SizedBox(
-                width: 120,
-                height: 3,
-                child: waiting
-                    ? const LinearProgressIndicator(
-                        color: maroon,
-                        backgroundColor: Color(0x66ffffff),
-                      )
-                    : null,
-              ),
-            ),
-          ],
-        );
-      },
+      child: BrandScene(
+        name: locale == 'hi' ? 'कुंडलीमिलान' : 'KundliMilan',
+        tagline: locale == 'hi'
+            ? 'प्राचीन ज्ञान\nएक उज्ज्वल भविष्य के लिए'
+            : 'Ancient Wisdom\nfor a Brighter Tomorrow',
+        below: [
+          SizedBox(
+            width: 140,
+            height: 3,
+            child: waiting
+                ? const LinearProgressIndicator(
+                    color: Palette.gold,
+                    backgroundColor: Color(0x66ffffff),
+                  )
+                : null,
+          ),
+          const SizedBox(height: 90),
+        ],
+      ),
+      builder: (context, child) =>
+          Opacity(opacity: (intro.value / 0.35).clamp(0.0, 1.0), child: child),
     ),
   );
 }

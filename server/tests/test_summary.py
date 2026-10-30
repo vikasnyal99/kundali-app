@@ -105,5 +105,6 @@ def test_person_avatar_is_optional_and_limited_to_the_app_set(client):
     h=token(client)
     assert person(client,h,'A')['avatar'] is None
     assert person(client,h,'B',avatar='female_1')['avatar']=='female_1'
+    assert person(client,h,'B2',avatar='male_3')['avatar']=='male_3'
     r=client.post('/v1/people',headers=h,json={'display_name':'C','birth_date':'1997-09-14','birth_time_local':'09:30:00','birth_timezone':'Asia/Kolkata','birth_place_name':'Delhi','latitude':28.6,'longitude':77.2,'avatar':'someone_else'})
     assert r.status_code==422

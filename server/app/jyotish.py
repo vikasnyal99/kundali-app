@@ -70,12 +70,12 @@ def north_chart(d,locale):
     by_house[1].insert(0,'La' if locale=='en' else 'ल')
     # Presentation attributes rather than CSS classes: WeasyPrint's SVG renderer ignores document styles.
     svg=['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="78mm" height="78mm" font-family="Noto Serif, serif">',
-         '<rect x="1" y="1" width="298" height="298" fill="#fffaf0" stroke="#7a2e1d" stroke-width="2"/>',
-         '<path d="M1 1L299 299M299 1L1 299M150 1L299 150L150 299L1 150Z" fill="none" stroke="#7a2e1d" stroke-width="1.3"/>']
+         '<rect x="1" y="1" width="298" height="298" fill="#fbf7ee" stroke="#1f4a33" stroke-width="2"/>',
+         '<path d="M1 1L299 299M299 1L1 299M150 1L299 150L150 299L1 150Z" fill="none" stroke="#1f4a33" stroke-width="1.3"/>']
     labels=[]
     for h in range(1,13):
         x,y=HOUSE_SIGN[h]
-        svg.append(f'<text x="{x}" y="{y+3.5}" font-size="10" fill="#c1611c" text-anchor="middle">{(lagna+h-1)%12+1}</text>')
+        svg.append(f'<text x="{x}" y="{y+3.5}" font-size="10" fill="#a97c2c" text-anchor="middle">{(lagna+h-1)%12+1}</text>')
         x,y=HOUSE_TEXT[h]; items=by_house[h]
         # Narrow triangles hold two per line, central houses three.
         per=3 if h in (1,4,7,10) else 2
