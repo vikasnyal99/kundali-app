@@ -8,6 +8,7 @@ import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kundli_milan/api.dart';
 import 'package:kundli_milan/main.dart';
+import 'package:kundli_milan/theme.dart';
 
 Map<String, dynamic> person(String id, String name) => {
   'id': id,
@@ -44,6 +45,7 @@ class FakeBackend {
   ];
   final requests = <http.Request>[];
   int reportPolls = 0;
+  Map<String, dynamic>? lastComparison;
   Map<String, dynamic> report(String status) => {
     'id': 'r1',
     'match_id': 'm-b',
@@ -77,7 +79,10 @@ class FakeBackend {
       case 'GET /v1/reports':
         return json([]);
       case 'POST /v1/comparisons':
-        return json(comparison(body['person1_id'], body['person2_ids']));
+        lastComparison = comparison(body['person1_id'], body['person2_ids']);
+        return json(lastComparison!);
+      case 'GET /v1/comparisons/cmp':
+        return json(lastComparison!);
       case 'POST /v1/matches':
         return json(
           comparison(body['person1_id'], [body['person2_id']])['results'][0],
@@ -174,12 +179,19 @@ Future<FakeBackend> launch(
   return backend;
 }
 
-Future<void> choose(WidgetTester tester, String label, String option) async {
-  await tester.tap(find.widgetWithText(DropdownButtonFormField<String>, label));
+/// Taps a person in a Select Person list, then the page's bottom action.
+Future<void> pick(WidgetTester tester, String name, String action) async {
+  await tester.tap(find.text(name).last);
   await tester.pumpAndSettle();
-  await tester.tap(find.text(option).last);
+  await tester.tap(find.text(action).last);
   await tester.pumpAndSettle();
 }
+
+Finder candidate(String id) => find.byKey(ValueKey('candidate-$id'));
+
+VoidCallback? actionOf(WidgetTester tester, String label) => tester
+    .widget<PrimaryButton>(find.widgetWithText(PrimaryButton, label))
+    .onPressed;
 
 void main() {
   // Cached asset futures are bound to the previous test's fake-async zone.
@@ -188,22 +200,21 @@ void main() {
     'Person 1 stays fixed while candidates are compared, changed and re-compared',
     (tester) async {
       final backend = await launch(tester);
-      await tester.tap(find.text('Compare candidates'));
+      await tester.tap(find.text('Compare\nCandidates'));
       await tester.pumpAndSettle();
-      final compareButton = find.widgetWithText(
-        FilledButton,
-        'Compare selected candidates',
-      );
-      expect(tester.widget<FilledButton>(compareButton).onPressed, isNull);
+      expect(actionOf(tester, 'Compare Selected (0)'), isNull);
 
-      await choose(tester, 'Person 1 · stays fixed', 'Asha');
+      await tester.tap(find.text('Choose Person 1'));
+      await tester.pumpAndSettle();
+      await pick(tester, 'Asha', 'Next');
+      expect(find.text('Person 1 (Fixed)'), findsOneWidget);
       // Person 1 is never offered as a candidate.
-      expect(find.widgetWithText(CheckboxListTile, 'Asha'), findsNothing);
-      for (final name in ['Bharat', 'Chetan', 'Dev']) {
-        await tester.tap(find.widgetWithText(CheckboxListTile, name));
+      expect(candidate('a'), findsNothing);
+      for (final id in ['b', 'c', 'd']) {
+        await tester.tap(candidate(id));
       }
       await tester.pumpAndSettle();
-      await tester.tap(compareButton);
+      await tester.tap(find.text('Compare Selected (3)'));
       await tester.pumpAndSettle();
 
       expect(backend.comparisonBodies().single, {
@@ -211,59 +222,82 @@ void main() {
         'person2_ids': ['b', 'c', 'd'],
         'locale': 'en',
       });
-      expect(find.text('1. Bharat'), findsOneWidget);
-      expect(find.text('2. Chetan'), findsOneWidget);
-      expect(find.text('3. Dev'), findsOneWidget);
-      expect(find.text('24.0 / 36 · Tied score'), findsNWidgets(2));
-      expect(
-        find.text('18.5 / 36 · Has warnings — open details'),
-        findsOneWidget,
-      );
+      expect(find.text('Compatibility with candidates'), findsOneWidget);
+      expect(find.text('24/36'), findsNWidgets(2));
+      expect(find.text('Tied score'), findsNWidgets(2));
+      expect(find.text('18.5/36'), findsOneWidget);
+      expect(find.text('Has warnings — open details'), findsOneWidget);
+      expect(find.text('Moderate'), findsNWidgets(3));
+      final order = [
+        'Bharat',
+        'Chetan',
+        'Dev',
+      ].map((n) => tester.getTopLeft(find.text(n)).dy).toList();
+      expect(order, [...order]..sort());
 
-      // Removing a candidate clears stale results but keeps Person 1.
-      await tester.tap(find.widgetWithText(CheckboxListTile, 'Chetan'));
+      // Back on the list: dropping a candidate re-compares with Person 1 kept.
+      await tester.pageBack();
       await tester.pumpAndSettle();
-      expect(find.text('1. Bharat'), findsNothing);
-      await tester.tap(compareButton);
+      await tester.tap(candidate('c'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Compare Selected (2)'));
       await tester.pumpAndSettle();
       expect(backend.comparisonBodies().last['person1_id'], 'a');
       expect(backend.comparisonBodies().last['person2_ids'], ['b', 'd']);
-      expect(find.text('24.0 / 36'), findsOneWidget);
+      expect(find.text('Tied score'), findsNothing);
 
       // Changing Person 1 is explicit and drops that person from the candidate set.
-      await choose(tester, 'Person 1 · stays fixed', 'Bharat');
-      expect(find.widgetWithText(CheckboxListTile, 'Bharat'), findsNothing);
-      expect(tester.widget<FilledButton>(compareButton).onPressed, isNull);
-      await tester.tap(find.widgetWithText(CheckboxListTile, 'Asha'));
+      await tester.pageBack();
       await tester.pumpAndSettle();
-      await tester.tap(compareButton);
+      await tester.tap(find.text('Edit'));
+      await tester.pumpAndSettle();
+      await pick(tester, 'Bharat', 'Next');
+      expect(candidate('b'), findsNothing);
+      expect(actionOf(tester, 'Compare Selected (1)'), isNull);
+      await tester.tap(candidate('a'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Compare Selected (2)'));
       await tester.pumpAndSettle();
       expect(backend.comparisonBodies().last, {
         'person1_id': 'b',
         'person2_ids': ['d', 'a'],
         'locale': 'en',
       });
-      // Let the poll timer observe the finished results and stop.
-      await tester.pump(const Duration(seconds: 4));
     },
   );
 
   testWidgets(
-    'a match opens its summary at once and the full report is generated from there',
+    'Select Person 1 → Person 2 opens the detailed report; the full PDF is generated from there',
     (tester) async {
       final backend = await launch(tester);
       await tester.tap(find.text('Match Kundlis'));
       await tester.pumpAndSettle();
-      await choose(tester, 'Person 1 · stays fixed', 'Asha');
-      await choose(tester, 'Person 2', 'Bharat');
-      await tester.tap(find.text('Generate match'));
-      await tester.pumpAndSettle();
+      expect(find.text('Select Person 1'), findsOneWidget);
+      await pick(tester, 'Asha', 'Next');
+      expect(find.text('Select Person 2'), findsOneWidget);
+      expect(find.text('Asha'), findsNothing); // Person 1 is not offered again
+      await pick(tester, 'Bharat', 'Match Kundlis');
 
-      expect(find.text('Asha  &  Bharat'), findsOneWidget);
-      expect(find.text('Good match (Uttam)'), findsWidgets);
-      expect(find.text('Asha and Bharat share 24 of 36 gunas.'), findsOneWidget);
+      expect(find.text('Detailed Report'), findsOneWidget);
+      expect(find.text('Compatibility Score'), findsOneWidget);
+      expect(find.text('Moderate'), findsOneWidget); // 24 of 36
+      expect(
+        find.text('Asha and Bharat share 24 of 36 gunas.'),
+        findsOneWidget,
+      );
+      expect(find.text('Key Strengths'), findsOneWidget);
+
+      await tester.tap(find.text('Guna Details'));
+      await tester.pumpAndSettle();
       expect(find.text('Different nadis are favourable.'), findsOneWidget);
       expect(find.text('Asha: Aadi   ·   Bharat: Antya'), findsOneWidget);
+      await tester.tap(find.text('Doshas'));
+      await tester.pumpAndSettle();
+      expect(find.text('Nadi Dosha'), findsOneWidget);
+      expect(find.text('Not present'), findsOneWidget);
+      await tester.tap(find.text('Remedies'));
+      await tester.pumpAndSettle();
+      expect(find.text('Talk openly.'), findsOneWidget);
 
       await tester.scrollUntilVisible(find.text('Generate full report'), 300);
       await tester.tap(find.text('Generate full report'));
@@ -280,7 +314,6 @@ void main() {
       expect(find.text('Download PDF'), findsOneWidget);
     },
   );
-
   testWidgets('API errors are localised and offer retry', (tester) async {
     await launch(
       tester,
@@ -359,85 +392,130 @@ void main() {
   );
 
   Future<void> openEditor(WidgetTester tester) async {
-    await tester.tap(find.text('Saved people').last);
+    await tester.tap(find.text('People').last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Add person'));
     await tester.pumpAndSettle();
   }
 
+  Future<void> confirmAndSave(WidgetTester tester) async {
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(CheckboxListTile));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save details'));
+    await tester.pumpAndSettle();
+  }
+
   Future<void> choosePlace(WidgetTester tester, String query) async {
-    await tester.enterText(find.widgetWithText(TextFormField, 'City, town or 6-digit pincode'), query);
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'City, town or 6-digit pincode'),
+      query,
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Varanasi, Uttar Pradesh, IN'));
     await tester.pumpAndSettle();
   }
 
   Map<String, dynamic> saved(FakeBackend b) => jsonDecode(
-    b.requests.lastWhere((r) => r.method == 'POST' && r.url.path == '/v1/people').body,
+    b.requests
+        .lastWhere((r) => r.method == 'POST' && r.url.path == '/v1/people')
+        .body,
   );
 
-  testWidgets('new person form: one place search, DD/MM/YYYY and 12-hour time', (
-    tester,
-  ) async {
-    final backend = await launch(tester, setup: (b) => b.overrides['POST /v1/people'] = FakeBackend.json({'id': 'n'}, 201));
-    await openEditor(tester);
-    expect(find.text('Latitude'), findsNothing);
-    expect(find.text('Longitude'), findsNothing);
-    await tester.enterText(find.byType(TextFormField).first, 'Deepak Saini');
-    await choosePlace(tester, '221001');
-    expect(backend.requests.last.url.queryParameters['q'], '221001');
-    final boxes = find.byWidgetPredicate((w) => w is TextField && w.maxLength != null);
-    for (final (i, v) in ['05', '03', '1995', '09', '30'].indexed) {
-      await tester.enterText(boxes.at(i), v);
-    }
-    await tester.tap(find.text('PM'));
-    await tester.tap(find.byType(CheckboxListTile));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Save details'));
-    await tester.pumpAndSettle();
-    expect(saved(backend), {
-      'display_name': 'Deepak Saini',
-      'birth_place_name': 'Varanasi, Uttar Pradesh, IN',
-      'latitude': 25.3167,
-      'longitude': 83.0104,
-      'birth_timezone': 'Asia/Kolkata',
-      'birth_date': '1995-03-05',
-      'time_accuracy': 'exact',
-      'birth_time_local': '21:30:00',
-      'fold': null,
-    });
-  });
+  testWidgets(
+    'new person form: one place search, DD/MM/YYYY and 12-hour time',
+    (tester) async {
+      final backend = await launch(
+        tester,
+        setup: (b) =>
+            b.overrides['POST /v1/people'] = FakeBackend.json({'id': 'n'}, 201),
+      );
+      await openEditor(tester);
+      expect(find.text('Latitude'), findsNothing);
+      expect(find.text('Longitude'), findsNothing);
+      await tester.enterText(find.byType(TextFormField).first, 'Deepak Saini');
+      await choosePlace(tester, '221001');
+      expect(backend.requests.last.url.queryParameters['q'], '221001');
+      final boxes = find.byWidgetPredicate(
+        (w) => w is TextField && w.maxLength != null,
+      );
+      for (final (i, v) in ['05', '03', '1995', '09', '30'].indexed) {
+        await tester.enterText(boxes.at(i), v);
+      }
+      await tester.tap(find.text('PM'));
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
+      // Confirm step shows the entries in words before saving.
+      expect(find.text('5 Mar 1995'), findsOneWidget);
+      expect(find.text('9:30 PM'), findsOneWidget);
+      expect(find.text('Varanasi, Uttar Pradesh, IN'), findsOneWidget);
+      await tester.tap(find.byType(CheckboxListTile));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save details'));
+      await tester.pumpAndSettle();
+      expect(saved(backend), {
+        'display_name': 'Deepak Saini',
+        'birth_place_name': 'Varanasi, Uttar Pradesh, IN',
+        'latitude': 25.3167,
+        'longitude': 83.0104,
+        'birth_timezone': 'Asia/Kolkata',
+        'birth_date': '1995-03-05',
+        'time_accuracy': 'exact',
+        'birth_time_local': '21:30:00',
+        'fold': null,
+      });
+    },
+  );
 
-  testWidgets('unknown birth time hides the time and sends none; place must be chosen', (
-    tester,
-  ) async {
-    final backend = await launch(tester, setup: (b) => b.overrides['POST /v1/people'] = FakeBackend.json({'id': 'n'}, 201));
-    await openEditor(tester);
-    await tester.enterText(find.byType(TextFormField).first, 'Kirti');
-    await tester.enterText(find.widgetWithText(TextFormField, 'City, town or 6-digit pincode'), 'Somewhere');
-    await tester.tap(find.text('Unknown'));
-    await tester.pumpAndSettle();
-    expect(find.text('Time of birth'), findsNothing);
-    final boxes = find.byWidgetPredicate((w) => w is TextField && w.maxLength != null);
-    expect(boxes, findsNWidgets(3));
-    for (final (i, v) in ['31', '02', '1996'].indexed) {
-      await tester.enterText(boxes.at(i), v);
-    }
-    await tester.tap(find.byType(CheckboxListTile));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Save details'));
-    await tester.pumpAndSettle();
-    expect(find.text('Choose the birth place from the suggestions'), findsOneWidget);
-    expect(find.text('Enter a valid date of birth (DD / MM / YYYY)'), findsOneWidget); // 31 February
-    expect(backend.requests.where((r) => r.url.path == '/v1/people' && r.method == 'POST'), isEmpty);
+  testWidgets(
+    'unknown birth time hides the time and sends none; place must be chosen',
+    (tester) async {
+      final backend = await launch(
+        tester,
+        setup: (b) =>
+            b.overrides['POST /v1/people'] = FakeBackend.json({'id': 'n'}, 201),
+      );
+      await openEditor(tester);
+      await tester.enterText(find.byType(TextFormField).first, 'Kirti');
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'City, town or 6-digit pincode'),
+        'Somewhere',
+      );
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+      expect(find.text('Time of birth'), findsNothing);
+      final boxes = find.byWidgetPredicate(
+        (w) => w is TextField && w.maxLength != null,
+      );
+      expect(boxes, findsNWidgets(3));
+      for (final (i, v) in ['31', '02', '1996'].indexed) {
+        await tester.enterText(boxes.at(i), v);
+      }
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Choose the birth place from the suggestions'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Enter a valid date of birth (DD / MM / YYYY)'),
+        findsOneWidget,
+      ); // 31 February
+      expect(
+        backend.requests.where(
+          (r) => r.url.path == '/v1/people' && r.method == 'POST',
+        ),
+        isEmpty,
+      );
 
-    await choosePlace(tester, 'Vara');
-    await tester.enterText(boxes.at(0), '29');
-    await tester.tap(find.text('Save details'));
-    await tester.pumpAndSettle();
-    final body = saved(backend);
-    expect(body['time_accuracy'], 'unknown');
-    expect(body.containsKey('birth_time_local'), isFalse);
-    expect(body['birth_date'], '1996-02-29');
-  });
+      await choosePlace(tester, 'Vara');
+      await tester.enterText(boxes.at(0), '29');
+      await confirmAndSave(tester);
+      final body = saved(backend);
+      expect(body['time_accuracy'], 'unknown');
+      expect(body.containsKey('birth_time_local'), isFalse);
+      expect(body['birth_date'], '1996-02-29');
+    },
+  );
 }

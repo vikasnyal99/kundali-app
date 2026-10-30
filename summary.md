@@ -453,3 +453,31 @@ than a WebView wrapper.
 - **Shipping a screen change:** push, then on the server `sudo git pull && sudo SITE=kundaliapi.zivantaai.com bash
   infra/server-deploy.sh`. No new APK; the shell only needs rebuilding for native changes
   (`flutter build apk --release --split-per-abi -t lib/shell.dart`).
+
+## 15. UI redesign from the Figma reference (2026-10-30)
+
+**Source:** `/home/vikas/Downloads/Figma.jpeg` (7 screens, English and Hindi). Implemented in the web app (ships with a
+server deploy) plus the native splash (needs the new APK once).
+
+| Area | Change | Where |
+|---|---|---|
+| Look | Cream paper, deep green pill buttons, gold accents, serif headings (Noto Serif + Noto Serif Devanagari SemiBold, subset to 62 KB + 253 KB, OFL), white rounded cards, verdict chips Excellent / Good / Moderate / Challenging (Hindi: उत्कृष्ट अनुकूलता / अच्छी अनुकूलता / मध्यम / चुनौतीपूर्ण; same 33/25/18 thresholds), initial avatars | `mobile/lib/theme.dart`, `mobile/assets/fonts/` |
+| Artwork | Vector stand-ins drawn in code (no images): gold mandala, sunrise/zodiac-arc/temple/river banner, botanical sprigs and lotus | `mobile/lib/art.dart` |
+| Language screen | Mandala, name (Hindi: कुंडलीमिलान), "Ancient Wisdom for a Brighter Tomorrow", English/हिंदी pills (choosing one enters the app), "Traditional • Trusted • Thoughtful" | `main.dart` `LanguageScreen` |
+| Home | Banner with "Discover Your Compatibility", Match Kundlis, tiles (Compare Candidates, Saved People, Previous Reports), Recent Reports with score and chip; bottom nav Home / People / Reports / Settings | `main.dart` `Shell` |
+| Match | Select Person 1 → Select Person 2 lists (Saved People / Add New, search, radio) → Detailed Report | `people.dart` `PickPersonPage`, `main.dart` `startMatch` |
+| Compare | Person 1 (Fixed) card with Edit, checkbox list, "Compare Selected (n)", ranked results (gold #1, rank circles, chips, score, tie label; "Has warnings" only for pair-specific warnings) | `matching.dart` `CompareFlow`, `ComparisonResults` |
+| Detailed Report | Couple header with heart; tabs Summary (score ring, chip, AI summary, Key Strengths, Points to consider) / Guna Details (koota cards, method) / Doshas (Nadi, Bhakoot, Gana present or not, Manglik not evaluated, parihar note) / Remedies (AI guidance + "consult an astrologer"; nothing prescribed); full PDF card at the end | `matching.dart` `MatchDetail` |
+| Person form | Design styling with labels above fields and Details → Confirm steps; kept the owner's order and inputs (name, pincode/city search, "I don't know the exact time" switch, DD/MM/YYYY, HH:MM AM/PM, optional "approximate") | `people.dart` `PersonEditor` |
+| Native splash | Mandala grows ring by ring, serif name, new palette | `shell.dart` |
+
+Code split: `common.dart` (helpers, PersonRow, ReportRow), `people.dart`, `matching.dart`, `main.dart`.
+`infra/Dockerfile` also copies `mobile/assets` (fonts) into the web build.
+
+**Verification:** `flutter analyze` clean; `flutter test` 14 passed (rewritten flows: compare with fixed Person 1,
+ranking, ties, re-compare and changing Person 1; Select Person 1 → 2 → report tabs → PDF; two-step form; onboarding
+by language choice). Checked in Chrome against a local server with sample data: language screen (Hindi), home
+(English and Hindi), people, reports, Compare Multiple, ranked results, Detailed Report.
+Not reproduced from the design: painted illustrations and photo avatars (replaced by vector art and initials); the
+hamburger and bell icons (no menu or notifications exist).
+APKs rebuilt: `app-arm64-v8a-release.apk` (16.6 MB), `app-release.apk` (46.2 MB).

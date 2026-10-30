@@ -24,3 +24,12 @@ flutter:
   assets:
     - lib/l10n/app_en.arb
     - lib/l10n/app_hi.arb
+  fonts:
+    - family: KundliSerif
+      fonts:
+        - asset: assets/fonts/NotoSerif-SemiBold-subset.ttf
+          weight: 600
+    - family: KundliSerifDeva
+      fonts:
+        - asset: assets/fonts/NotoSerifDevanagari-SemiBold-subset.ttf
+          weight: 600

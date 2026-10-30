@@ -6,6 +6,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'art.dart';
+import 'theme.dart';
 
 /// Native entry point of the Android app: a short animated splash, then the web app (lib/main.dart
 /// built with `flutter build web`) in a full-screen WebView, so app changes ship with a server deploy.
@@ -14,9 +16,8 @@ const appUrl = String.fromEnvironment(
   'APP_URL',
   defaultValue: 'https://kundaliapi.zivantaai.com/',
 );
-const cream = Color(0xfffff8ef),
-    maroon = Color(0xff7a2e1d),
-    gold = Color(0xffd9a441);
+// Same palette as the web app (theme.dart), so the hand-over from splash to app is seamless.
+const cream = Palette.background, maroon = Palette.green;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -218,8 +219,8 @@ class Splash extends StatelessWidget {
             children: [
               CustomPaint(
                 size: const Size.square(150),
-                painter: KundaliPainter(
-                  Curves.easeInOut.transform((intro.value / 0.7).clamp(0, 1)),
+                painter: MandalaPainter(
+                  Curves.easeOut.transform((intro.value / 0.75).clamp(0, 1)),
                 ),
               ),
               const SizedBox(height: 28),
@@ -227,24 +228,13 @@ class Splash extends StatelessWidget {
                 opacity: text,
                 child: Transform.translate(
                   offset: Offset(0, 12 * (1 - text)),
-                  child: const Column(
+                  child: Column(
                     children: [
-                      Text(
-                        'KundliMilan',
-                        style: TextStyle(
-                          fontSize: 30,
-                          fontWeight: FontWeight.w600,
-                          color: maroon,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      SizedBox(height: 6),
+                      Text('KundliMilan', style: heading(34, color: maroon)),
+                      const SizedBox(height: 6),
                       Text(
                         'कुंडली मिलान · Guna Milan',
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: Color(0xff8a6a52),
-                        ),
+                        style: heading(15, color: const Color(0xff8a6a3a)),
                       ),
                     ],
                   ),
@@ -267,52 +257,6 @@ class Splash extends StatelessWidget {
       ),
     ),
   );
-}
-
-/// The North Indian kundali frame drawing itself: square, both diagonals, then the inner diamond,
-/// finishing with a gold dot at the centre.
-class KundaliPainter extends CustomPainter {
-  final double progress;
-  KundaliPainter(this.progress);
-  @override
-  void paint(Canvas canvas, Size size) {
-    final s = size.width, m = s / 2;
-    final paths = [
-      Path()..addRRect(RRect.fromLTRBR(0, 0, s, s, const Radius.circular(6))),
-      Path()
-        ..moveTo(0, 0)
-        ..lineTo(s, s),
-      Path()
-        ..moveTo(s, 0)
-        ..lineTo(0, s),
-      Path()
-        ..moveTo(m, 0)
-        ..lineTo(s, m)
-        ..lineTo(m, s)
-        ..lineTo(0, m)
-        ..close(),
-    ];
-    final stroke = Paint()
-      ..color = maroon
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.6
-      ..strokeCap = StrokeCap.round;
-    // Each segment draws in its own quarter of the timeline.
-    for (final (i, path) in paths.indexed) {
-      final t = ((progress - i * 0.22) / 0.34).clamp(0.0, 1.0);
-      if (t == 0) continue;
-      for (final metric in path.computeMetrics()) {
-        canvas.drawPath(metric.extractPath(0, metric.length * t), stroke);
-      }
-    }
-    final dot = ((progress - 0.85) / 0.15).clamp(0.0, 1.0);
-    if (dot > 0) {
-      canvas.drawCircle(Offset(m, m), 7 * dot, Paint()..color = gold);
-    }
-  }
-
-  @override
-  bool shouldRepaint(KundaliPainter old) => old.progress != progress;
 }
 
 class Offline extends StatelessWidget {

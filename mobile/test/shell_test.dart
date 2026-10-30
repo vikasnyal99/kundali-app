@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kundli_milan/art.dart';
 import 'package:kundli_milan/shell.dart';
 
 void main() {
@@ -52,7 +53,7 @@ void main() {
     },
   );
 
-  testWidgets('splash draws the kundali and shows the name', (tester) async {
+  testWidgets('splash draws the mandala and shows the name', (tester) async {
     final controller = AnimationController(
       vsync: const TestVSync(),
       duration: const Duration(seconds: 1),
@@ -65,7 +66,7 @@ void main() {
     expect(find.text('KundliMilan'), findsOneWidget);
     expect(
       find.byWidgetPredicate(
-        (w) => w is CustomPaint && w.painter is KundaliPainter,
+        (w) => w is CustomPaint && w.painter is MandalaPainter,
       ),
       findsOneWidget,
     );

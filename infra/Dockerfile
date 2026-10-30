@@ -17,6 +17,7 @@ COPY mobile/pubspec.yaml mobile/pubspec.lock ./
 RUN flutter pub get
 COPY mobile/lib ./lib
 COPY mobile/web ./web
+COPY mobile/assets ./assets
 COPY mobile/analysis_options.yaml ./
 RUN flutter build web --release -t lib/main.dart
 
