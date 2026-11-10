@@ -574,3 +574,9 @@ processed by `prepare_assets.py`; 27 images, 2.21 MB.
 **Deployed 2026-10-31 (`5ecddec`)** through SSM in Chrome: exit 0, `kundli-api` healthy, session closed. Live: crests and ornaments
 served, `api_smoke.sh` passed, Select Person 1 seen in Chrome (empty state). Not seen live: Select Person 2 and the Hindi page, which
 were checked only as test-harness renders. No new APK is needed.
+
+## 19. Detailed Report UI cleanup (2026-11-10)
+
+The Guna Details tab no longer renders raw `facts['calculation']` JSON, which included internal engine identifiers and UTC birth timestamps. It now shows a short localized explanation of the Ashta Koota method and points to Settings for methodology and privacy notes. The Doshas tab no longer shows the prominent Manglik-unavailable card. Newly generated AI and deterministic summary guidance no longer brings that placeholder into the app screen; summary cache version is `v3`. The backend still records `manglik: unavailable` and the PDF still discloses that Manglik was not evaluated, so no unsupported result is implied.
+
+Commit `8912381` was pushed and deployed to the shared EC2 host through SSM using `SITE=kundaliapi.zivantaai.com bash infra/server-deploy.sh`. The command exited 0; `kundli-api` and `kundli-worker` restarted healthy. Live `/health/ready` returned `{"status":"ok","calculation_available":true}`. The live web bundle contains the new method-note key and no `noManglik` key; both served ARB files contain the new note and no old Manglik card copy. Local checks: Flutter analyze clean, release web build succeeded, `tests/test_summary.py` 12 passed, and `git diff --check` clean. No APK rebuild was needed because this changes only the served web app and backend summary text.
