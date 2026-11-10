@@ -40,6 +40,15 @@ def test_validation_dst(client):
     p=person(client,h,birth_date='2024-11-03',birth_time_local='01:30:00',birth_timezone='America/New_York',fold=1).json()
     assert p['birth_utc']=='2024-11-03T06:30:00+00:00'
 
+def test_person_gender_portrait_and_manual_varna(client):
+    h=token(client)
+    response=person(client,h,gender='female',varna='Vaishya',avatar='male_3')
+    assert response.status_code==201
+    saved=response.json()
+    assert saved['gender']=='female' and saved['avatar']=='female_1' and saved['varna']=='Vaishya'
+    assert person(client,h,varna='Other').status_code==422
+    assert client.get('/v1/people/'+saved['id'],headers=h).json()['varna']=='Vaishya'
+
 def test_comparison_cache_and_failure(client):
     h=token(client); ps=[person(client,h,str(i)).json()['id'] for i in range(4)]
     body={'person1_id':ps[0],'person2_ids':ps[1:]}

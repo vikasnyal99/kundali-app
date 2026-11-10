@@ -10,6 +10,7 @@ from vedic_calc.chart.calculator import longitude_to_nakshatra_info, longitude_t
 from vedic_calc.core.constants import Planet, Sign, Nakshatra
 from vedic_calc.core.types import PlanetPosition
 from app import local_engine, services
+from app import jyotish
 from app.services import validate_facts, PermanentFailure, KOOTAS
 
 DELHI=dict(latitude=28.6139,longitude=77.209)
@@ -56,6 +57,22 @@ def test_person_order_is_rule_direction(monkeypatch):
     monkeypatch.setattr(local_engine,'moon',lambda p:moons[p['id']])
     varna=lambda first,second:local_engine.calculate_local(snapshot({'id':first,'birth_utc':'','time_accuracy':'exact'},{'id':second,'birth_utc':'','time_accuracy':'exact'}))['score']['kootas'][0]['earned']
     assert (varna('a','b'),varna('b','a'))==(0.0,1.0)
+
+def test_manual_varna_changes_only_varna_score_and_total(monkeypatch):
+    moons={'a':fake_moon(70.0),'b':fake_moon(100.0)}
+    monkeypatch.setattr(local_engine,'moon',lambda p:moons[p['id']])
+    original=local_engine.calculate_local(snapshot({'id':'a','birth_utc':'','time_accuracy':'exact'},{'id':'b','birth_utc':'','time_accuracy':'exact'}))
+    changed=local_engine.calculate_local(snapshot({'id':'a','birth_utc':'','time_accuracy':'exact','varna':'Brahmin'},{'id':'b','birth_utc':'','time_accuracy':'exact'}))
+    before={row['key']:row['earned'] for row in original['score']['kootas']}
+    after={row['key']:row['earned'] for row in changed['score']['kootas']}
+    assert before['varna']==0 and after['varna']==1
+    assert all(before[key]==after[key] for key in before if key!='varna')
+    assert changed['score']['earned']==original['score']['earned']+1
+    assert changed['calculation']['varna_source']==['manual','moon_sign']
+    assert 'manual_varna_override' in changed['warnings']
+
+def test_manual_varna_appears_in_avakhada_details():
+    assert jyotish.details({**P1, 'varna':'Vaishya'})['avakhada']['varna']=='Vaishya'
 
 def test_same_nadi_scores_zero(monkeypatch):
     monkeypatch.setattr(local_engine,'moon',lambda p:fake_moon(45.0))

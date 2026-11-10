@@ -7,7 +7,7 @@ from datetime import date, datetime, time, timezone
 from zoneinfo import ZoneInfo
 
 VERSION='vedic-calc-620d54560ee7+swe-2.10.3.2'
-RULESET='vedic-calc-ashtakoota-620d54560ee7+naisargika-maitri-v1'
+RULESET='vedic-calc-ashtakoota-620d54560ee7+naisargika-maitri-v1+manual-varna-v1'
 NAKSHATRA_SPAN=360/27
 # The Moon moves at most ~0.64 deg/hour; an "approximate" time is treated as +/- 1 hour.
 APPROXIMATE_WINDOW_DEGREES=0.65
@@ -58,6 +58,7 @@ def sign_index(m):
 
 def calculate_local(snapshot):
     from vedic_calc import calculate_compatibility
+    from vedic_calc.compatibility.constants import VARNA, VARNA_NAMES
     people=snapshot['people']
     moons=[moon(p) for p in people]
     # Upstream argument order is groom-side first, bride-side second (affects Varna, Gana, Vashya).
@@ -65,7 +66,12 @@ def calculate_local(snapshot):
     kootas=[{'key':k.name.lower().replace(' ','_'),'earned':k.obtained,'possible':k.maximum} for k in result.kuttas]
     for k in kootas:
         if k['key']=='graha_maitri': k['earned']=graha_maitri(sign_index(moons[0]),sign_index(moons[1]))
+        if k['key']=='varna' and any(p.get('varna') for p in people):
+            chosen=[p.get('varna') or VARNA_NAMES[VARNA[m.sign]] for p,m in zip(people,moons)]
+            ranks={name:rank for rank,name in VARNA_NAMES.items()}
+            k['earned']=1.0 if ranks[chosen[0]] <= ranks[chosen[1]] else 0.0
     warnings=['experimental_engine','independent_validation_pending']
+    if any(p.get('varna') for p in people): warnings.append('manual_varna_override')
     if any(p['time_accuracy']=='approximate' and boundary_distance(m.longitude)<APPROXIMATE_WINDOW_DEGREES for p,m in zip(people,moons)):
         warnings.append('moon_near_boundary_time_sensitive')
     # Unknown time: calculated for 12:00 noon local time (schemas.PersonInput); say so, and more strongly
@@ -75,7 +81,7 @@ def calculate_local(snapshot):
     if any(moon_changes_that_day(p) for p in unknown): warnings.append('unknown_time_moon_changes_that_day')
     return {
         'score':{'earned':sum(k['earned'] for k in kootas),'possible':36,'kootas':kootas},
-        'calculation':{'engine':'vedic-calc + Swiss Ephemeris','version':VERSION,'ruleset':RULESET,'ayanamsa':'lahiri','house_system':'whole_sign','calculated_at':datetime.now(timezone.utc).isoformat(),'role_order':'person1=groom-side; person2=bride-side','validation':'experimental; independent domain review pending','ephemeris':'Swiss Ephemeris default data lookup; Moshier fallback permitted','birth_utc':[p['birth_utc'] for p in people]},
+        'calculation':{'engine':'vedic-calc + Swiss Ephemeris','version':VERSION,'ruleset':RULESET,'ayanamsa':'lahiri','house_system':'whole_sign','calculated_at':datetime.now(timezone.utc).isoformat(),'role_order':'person1=groom-side; person2=bride-side','varna_source':['manual' if p.get('varna') else 'moon_sign' for p in people],'validation':'experimental; independent domain review pending','ephemeris':'Swiss Ephemeris default data lookup; Moshier fallback permitted','birth_utc':[p['birth_utc'] for p in people]},
         'warnings':warnings,'manglik':{'status':'unavailable'},
         'charts':[{'moon_longitude':m.longitude,'moon_sign':m.sign.name.lower(),'nakshatra':m.nakshatra_info.nakshatra.name.lower(),'pada':m.nakshatra_info.pada} for m in moons]
     }

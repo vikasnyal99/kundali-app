@@ -17,6 +17,8 @@ class PersonInput(BaseModel):
     fold: Literal[0,1] | None = None
     # Optional portrait from the app's asset set; display only, never used in calculations.
     avatar: Literal['female_1','female_2','female_3','male_1','male_2','male_3'] | None = None
+    gender: Literal['male','female'] | None = None
+    varna: Literal['Brahmin','Kshatriya','Vaishya','Shudra'] | None = None
     @model_validator(mode='after')
     def validate_birth(self):
         self.display_name = self.display_name.strip()
@@ -35,7 +37,11 @@ class PersonInput(BaseModel):
         return self
     def utc(self):
         return datetime.combine(self.birth_date,self.birth_time_local).replace(tzinfo=ZoneInfo(self.birth_timezone),fold=self.fold or 0).astimezone(timezone.utc)
-    def stored(self): return {**self.model_dump(mode='json'), 'birth_utc':self.utc().isoformat()}
+    def stored(self):
+        data = self.model_dump(mode='json')
+        if self.gender:
+            data['avatar'] = f'{self.gender}_1'
+        return {**data, 'birth_utc':self.utc().isoformat()}
 class MatchInput(BaseModel):
     model_config = ConfigDict(extra='forbid')
     person1_id: str

@@ -268,16 +268,24 @@ void main() {
   );
 
   testWidgets(
-    'Select Person 1 → Person 2 opens the detailed report; the full PDF is generated from there',
+    'both people selected on one screen open the detailed report; PDF follows',
     (tester) async {
       final backend = await launch(tester);
       await tester.tap(find.text('Match Kundlis'));
       await tester.pumpAndSettle();
-      expect(find.text('Select Person 1'), findsOneWidget);
-      await pick(tester, 'Asha', 'Next');
-      expect(find.text('Select Person 2'), findsOneWidget);
-      expect(find.text('Asha'), findsNothing); // Person 1 is not offered again
-      await pick(tester, 'Bharat', 'Match Kundlis');
+      expect(find.text('Choose both people'), findsOneWidget);
+      expect(actionOf(tester, 'Match Kundlis'), isNull);
+      await tester.tap(find.byType(PopupMenuButton<String>).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Asha').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(PopupMenuButton<String>).last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Bharat').last);
+      await tester.pumpAndSettle();
+      expect(actionOf(tester, 'Match Kundlis'), isNotNull);
+      await tester.tap(find.widgetWithText(PrimaryButton, 'Match Kundlis'));
+      await tester.pumpAndSettle();
 
       expect(find.text('Detailed Report'), findsOneWidget);
       expect(find.text('Compatibility Score'), findsOneWidget);
@@ -315,6 +323,24 @@ void main() {
       expect(find.text('Download PDF'), findsOneWidget);
     },
   );
+
+  testWidgets('portrait duet fits a narrow phone', (tester) async {
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    await launch(tester);
+    await tester.tap(find.text('Match Kundlis'));
+    await tester.pumpAndSettle();
+    expect(find.text('Choose both people'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byType(PopupMenuButton<String>).first);
+    await tester.pumpAndSettle();
+    expect(find.text('Add New Person'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('API errors are localised and offer retry', (tester) async {
     await launch(
       tester,
@@ -392,22 +418,20 @@ void main() {
     },
   );
 
-  testWidgets('Add New Person opens the form from either Select Person step', (
-    tester,
-  ) async {
+  testWidgets('Add New Person appears in both dropdowns', (tester) async {
     await launch(tester);
     await tester.tap(find.text('Match Kundlis'));
     await tester.pumpAndSettle();
-    expect(find.text('Step 1 of 2'), findsOneWidget);
-    expect(find.text('(Usually the Groom)'), findsOneWidget);
+    expect(find.text('Choose both people'), findsOneWidget);
+    await tester.tap(find.byType(PopupMenuButton<String>).first);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Add New Person'));
     await tester.pumpAndSettle();
     expect(find.text('Basic Information'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
-    await pick(tester, 'Asha', 'Next');
-    expect(find.text('Step 2 of 2'), findsOneWidget);
-    expect(find.text('(Usually the Bride)'), findsOneWidget);
+    await tester.tap(find.byType(PopupMenuButton<String>).last);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Add New Person'));
     await tester.pumpAndSettle();
     expect(find.text('Basic Information'), findsOneWidget);
@@ -457,6 +481,12 @@ void main() {
       expect(find.text('Latitude'), findsNothing);
       expect(find.text('Longitude'), findsNothing);
       await tester.enterText(find.byType(TextFormField).first, 'Deepak Saini');
+      await tester.tap(find.text('Male'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(DropdownButtonFormField<String>).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Vaishya').last);
+      await tester.pumpAndSettle();
       await choosePlace(tester, '221001');
       expect(backend.requests.last.url.queryParameters['q'], '221001');
       final boxes = find.byWidgetPredicate(
@@ -486,7 +516,9 @@ void main() {
         'time_accuracy': 'exact',
         'birth_time_local': '21:30:00',
         'fold': null,
-        'avatar': null,
+        'avatar': 'male_1',
+        'gender': 'male',
+        'varna': 'Vaishya',
       });
     },
   );
@@ -501,7 +533,7 @@ void main() {
       );
       await openEditor(tester);
       await tester.enterText(find.byType(TextFormField).first, 'Kirti');
-      await tester.tap(find.byKey(const ValueKey('avatar-female_1')));
+      await tester.tap(find.text('Female'));
       await tester.enterText(
         find.widgetWithText(TextFormField, 'City, town or 6-digit pincode'),
         'Somewhere',
@@ -541,6 +573,7 @@ void main() {
       expect(body.containsKey('birth_time_local'), isFalse);
       expect(body['birth_date'], '1996-02-29');
       expect(body['avatar'], 'female_1');
+      expect(body['gender'], 'female');
     },
   );
 }

@@ -31,6 +31,7 @@ class _PersonEditorState extends State<PersonEditor> {
   final focus = List.generate(5, (_) => FocusNode());
   Map<String, dynamic>? place;
   String? avatar;
+  String? gender, varna;
   String placeText = '';
   bool consent = false, busy = false, pm = false, askFold = false;
   bool unknown = false, approximate = false;
@@ -51,6 +52,14 @@ class _PersonEditorState extends State<PersonEditor> {
     if (p == null) return;
     name.text = p['display_name'] ?? '';
     avatar = p['avatar'];
+    gender =
+        p['gender'] ??
+        (avatar?.startsWith('female_') == true
+            ? 'female'
+            : avatar?.startsWith('male_') == true
+            ? 'male'
+            : null);
+    varna = p['varna'];
     placeText = p['birth_place_name'] ?? '';
     place = {
       'label': placeText,
@@ -135,6 +144,8 @@ class _PersonEditorState extends State<PersonEditor> {
           if (!unknown) 'birth_time_local': isoTime(),
           'fold': fold,
           'avatar': avatar,
+          'gender': gender,
+          'varna': varna,
         },
       );
       if (mounted) Navigator.pop(context, saved);
@@ -245,43 +256,33 @@ class _PersonEditorState extends State<PersonEditor> {
     ),
   );
 
-  /// Initials (default) or one of the portraits; the chosen one lifts and gets an emerald ring.
-  Widget avatarPicker() => SingleChildScrollView(
-    scrollDirection: Axis.horizontal,
-    clipBehavior: Clip.none,
-    child: Row(
-      spacing: 6,
-      children: [
-        for (final choice in [null, ...avatarChoices])
-          GestureDetector(
-            key: ValueKey('avatar-${choice ?? 'initials'}'),
-            onTap: () => setState(() => avatar = choice),
-            child: AnimatedScale(
-              scale: avatar == choice ? 1.08 : 1,
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutBack,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: avatar == choice
-                        ? Palette.green
-                        : Colors.transparent,
-                    width: 2.4,
-                  ),
-                ),
-                child: Avatar(
-                  name.text.trim().isEmpty ? '?' : name.text.trim(),
-                  image: choice,
-                  size: 56,
-                ),
-              ),
-            ),
-          ),
-      ],
-    ),
+  Widget genderPicker(VoidCallback validate) => Row(
+    children: [
+      Avatar(
+        name.text.trim().isEmpty ? '?' : name.text.trim(),
+        image: avatar,
+        size: 62,
+      ),
+      const SizedBox(width: 14),
+      Expanded(
+        child: SegmentedButton<String>(
+          segments: [
+            ButtonSegment(value: 'male', label: Text(t('male'))),
+            ButtonSegment(value: 'female', label: Text(t('female'))),
+          ],
+          selected: gender == null ? {} : {gender!},
+          emptySelectionAllowed: true,
+          onSelectionChanged: (value) {
+            if (value.isEmpty) return;
+            setState(() {
+              gender = value.first;
+              avatar = '${gender}_1';
+            });
+            validate();
+          },
+        ),
+      ),
+    ],
   );
 
   Widget details() => Form(
@@ -298,8 +299,39 @@ class _PersonEditorState extends State<PersonEditor> {
           validator: (v) =>
               v == null || v.trim().isEmpty ? t('required') : null,
         ),
-        FieldLabel(t('chooseAvatar')),
-        avatarPicker(),
+        FieldLabel(t('gender')),
+        FormField<void>(
+          validator: (_) => gender == null ? t('required') : null,
+          builder: (state) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              genderPicker(() {
+                state.validate();
+              }),
+              errorText(state),
+            ],
+          ),
+        ),
+        FieldLabel(t('astrologicalVarna')),
+        DropdownButtonFormField<String>(
+          initialValue: varna,
+          hint: Text(t('selectVarna')),
+          items: [
+            DropdownMenuItem<String>(
+              value: null,
+              child: Text(t('calculatedVarna')),
+            ),
+            ...const ['Brahmin', 'Kshatriya', 'Vaishya', 'Shudra'].map(
+              (v) => DropdownMenuItem(value: v, child: Text(t('varna_$v'))),
+            ),
+          ],
+          onChanged: (v) => setState(() => varna = v),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          t('varnaOverrideNote'),
+          style: const TextStyle(fontSize: 12, color: Palette.muted),
+        ),
         FieldLabel(t('birthPlace')),
         placeField(),
         const SizedBox(height: 10),
@@ -420,6 +452,12 @@ class _PersonEditorState extends State<PersonEditor> {
                 ],
               ),
               row(Icons.location_on_outlined, place!['label'].toString()),
+              if (gender != null) row(Icons.person_outline, t(gender!)),
+              if (varna != null)
+                row(
+                  Icons.auto_awesome,
+                  '${t('astrologicalVarna')}: ${t('varna_$varna')}',
+                ),
               row(
                 Icons.calendar_today_outlined,
                 displayDate(date, widget.locale),

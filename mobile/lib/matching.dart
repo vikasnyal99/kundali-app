@@ -869,6 +869,7 @@ class _MatchDetailState extends State<MatchDetail> {
         for (final w in [
           'birth_time_unknown_noon',
           'unknown_time_moon_changes_that_day',
+          'manual_varna_override',
         ])
           if ((facts['warnings'] as List).contains(w))
             Padding(
@@ -879,8 +880,10 @@ class _MatchDetailState extends State<MatchDetail> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(
-                      Icons.schedule,
+                    Icon(
+                      w == 'manual_varna_override'
+                          ? Icons.info_outline
+                          : Icons.schedule,
                       size: 20,
                       color: Color(0xff8a5a00),
                     ),
@@ -1034,7 +1037,11 @@ class _MatchDetailState extends State<MatchDetail> {
           padding: const EdgeInsets.only(top: 12),
           child: Text(
             t('gunaMethodNote'),
-            style: const TextStyle(fontSize: 12, color: Palette.muted, height: 1.5),
+            style: const TextStyle(
+              fontSize: 12,
+              color: Palette.muted,
+              height: 1.5,
+            ),
           ),
         ),
       ],

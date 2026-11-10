@@ -7,6 +7,7 @@ import 'api.dart';
 import 'common.dart';
 import 'matching.dart';
 import 'people.dart';
+import 'pair_picker.dart';
 import 'theme.dart';
 import 'web_bridge.dart';
 
@@ -289,63 +290,37 @@ class _ShellState extends State<Shell> {
     ),
   );
 
-  /// Match Kundlis: Select Person 1 → Select Person 2 → the detailed report.
+  /// Match Kundlis: select both people together, then open the detailed report.
   Future<void> startMatch() async {
-    Map? first;
-    while (true) {
-      if (!mounted) return;
-      first = await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => PickPersonPage(
-            api: widget.api,
-            t: widget.t,
-            locale: widget.locale,
-            title: t('selectPerson1'),
-            action: t('next'),
-            selected: first?['id'],
-          ),
-        ),
-      );
-      if (first == null || !mounted) break;
-      final person1 = first;
-      final done = await Navigator.push<bool>(
-        context,
-        MaterialPageRoute(
-          builder: (pageContext) => PickPersonPage(
-            api: widget.api,
-            t: widget.t,
-            locale: widget.locale,
-            title: t('selectPerson2'),
-            action: t('match'),
-            side: PersonSide.second,
-            exclude: person1['id'],
-            onConfirm: (second) async {
-              final m = await widget.api.request('POST', '/v1/matches', {
-                'person1_id': person1['id'],
-                'person2_id': second['id'],
-                'locale': widget.locale,
-              });
-              if (!pageContext.mounted) return;
-              await Navigator.pushReplacement(
-                pageContext,
-                MaterialPageRoute(
-                  builder: (_) => MatchDetail(
-                    api: widget.api,
-                    t: widget.t,
-                    locale: widget.locale,
-                    match: Map<String, dynamic>.from(m),
-                  ),
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (pageContext) => PairPickerPage(
+          api: widget.api,
+          t: widget.t,
+          locale: widget.locale,
+          onConfirm: (first, second) async {
+            final m = await widget.api.request('POST', '/v1/matches', {
+              'person1_id': first['id'],
+              'person2_id': second['id'],
+              'locale': widget.locale,
+            });
+            if (!pageContext.mounted) return;
+            await Navigator.pushReplacement(
+              pageContext,
+              MaterialPageRoute(
+                builder: (_) => MatchDetail(
+                  api: widget.api,
+                  t: widget.t,
+                  locale: widget.locale,
+                  match: Map<String, dynamic>.from(m),
                 ),
-                result: true,
-              );
-            },
-          ),
+              ),
+            );
+          },
         ),
-      );
-      // Back from Person 2 returns to Person 1 with the choice kept.
-      if (done == true) break;
-    }
+      ),
+    );
     if (mounted) await task(reload);
   }
 

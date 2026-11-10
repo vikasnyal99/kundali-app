@@ -48,7 +48,7 @@ def details(person):
     ava=calculate_avakhada(moon.nakshatra_info.nakshatra,moon.nakshatra_info.pada,moon.sign)
     return {'lagna':position(chart.ascendant),
             'planets':{k:position(chart.planets[Planet(i)]) for i,k in enumerate(PLANET_KEYS)},
-            'avakhada':{'varna':ava.varna,'vashya':ava.vashya,'yoni':ava.yoni,'gana':ava.gana,'nadi':ava.nadi,
+            'avakhada':{'varna':person.get('varna') or ava.varna,'vashya':ava.vashya,'yoni':ava.yoni,'gana':ava.gana,'nadi':ava.nadi,
                         'sign_lord':PLANET_KEYS[ava.sign_lord.value],'nakshatra_lord':PLANET_KEYS[ava.nakshatra_lord.value],
                         'name_letter':ava.name_letter,'tatva':ava.tatva,'paya':ava.paya}}
 

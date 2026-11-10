@@ -8,9 +8,11 @@ from . import jyotish
 from .summary import context, template, num
 
 WARNINGS={'en':{'experimental_engine':'Experimental calculation engine.','independent_validation_pending':'Independent validation of the rules is pending.','approximate_birth_time':'At least one birth time is approximate.','moon_near_boundary_time_sensitive':'The Moon is near a nakshatra or sign boundary; an approximate birth time could change the result.',
+  'manual_varna_override':'A manually selected Varna was used for matching and the Avakhada details.',
   'birth_time_unknown_noon':'A birth time is unknown, so that chart was calculated for 12:00 noon; its Lagna is not shown.',
   'unknown_time_moon_changes_that_day':'On the day with the unknown birth time the Moon changed nakshatra or rashi, so the guna score may differ; a birth time is needed for a reliable result.'},
  'hi':{'experimental_engine':'प्रायोगिक गणना इंजन।','independent_validation_pending':'नियमों का स्वतंत्र सत्यापन लंबित है।','approximate_birth_time':'कम से कम एक जन्म समय अनुमानित है।','moon_near_boundary_time_sensitive':'चंद्रमा नक्षत्र या राशि सीमा के निकट है; अनुमानित जन्म समय से परिणाम बदल सकता है।',
+  'manual_varna_override':'मिलान और अवकहड़ा विवरण में चुना हुआ वर्ण उपयोग किया गया है।',
   'birth_time_unknown_noon':'एक जन्म समय अज्ञात है, इसलिए वह कुंडली दोपहर 12:00 बजे के अनुसार बनाई गई है; उसका लग्न नहीं दिखाया गया।',
   'unknown_time_moon_changes_that_day':'अज्ञात जन्म समय वाले दिन चंद्रमा ने नक्षत्र या राशि बदली, इसलिए गुण बदल सकते हैं; विश्वसनीय परिणाम के लिए जन्म समय आवश्यक है।'}}
 LABELS={'en':{'title':'Kundli matching report','subtitle':'Ashta Koota Guna Milan','invocation':'॥ श्री गणेशाय नमः ॥',
