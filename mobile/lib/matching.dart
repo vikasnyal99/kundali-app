@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'api.dart';
@@ -1031,14 +1030,12 @@ class _MatchDetailState extends State<MatchDetail> {
         Text(t('breakdown'), style: heading(17)),
         const SizedBox(height: 10),
         for (final k in kootas) kootaRow(k),
-        ExpansionTile(
-          tilePadding: EdgeInsets.zero,
-          title: Text(t('method')),
-          children: [
-            SelectableText(
-              const JsonEncoder.withIndent('  ').convert(facts['calculation']),
-            ),
-          ],
+        Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Text(
+            t('gunaMethodNote'),
+            style: const TextStyle(fontSize: 12, color: Palette.muted, height: 1.5),
+          ),
         ),
       ],
     );
@@ -1082,16 +1079,6 @@ class _MatchDetailState extends State<MatchDetail> {
                 ),
               ),
             ),
-        AppCard(
-          child: Row(
-            children: [
-              const Icon(Icons.help_outline, color: Palette.muted),
-              const SizedBox(width: 10),
-              Expanded(child: Text(t('noManglik'))),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
         Text(
           t('pariharNote'),
           style: const TextStyle(fontSize: 13, color: Palette.muted),

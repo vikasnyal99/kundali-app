@@ -13,7 +13,7 @@ from .config import settings
 from . import jyotish
 
 log=logging.getLogger('summary')
-VERSION='v2'  # bump when the prompt changes so cached summaries regenerate
+VERSION='v3'  # bump when the prompt changes so cached summaries regenerate
 KOOTA_ORDER=['varna','vashya','tara','yoni','graha_maitri','gana','bhakoot','nadi']
 KOOTA_NAMES={'en':{'varna':'Varna','vashya':'Vashya','tara':'Tara','yoni':'Yoni','graha_maitri':'Graha Maitri','gana':'Gana','bhakoot':'Bhakoot','nadi':'Nadi'},
  'hi':{'varna':'वर्ण','vashya':'वश्य','tara':'तारा','yoni':'योनि','graha_maitri':'ग्रह मैत्री','gana':'गण','bhakoot':'भकूट','nadi':'नाड़ी'}}
@@ -70,7 +70,7 @@ TEXT={'en':{
   'cultural':'This is a cultural reading, not a prediction about the relationship.',
   'compare':'{P1}: {a}; {P2}: {b}.','full':'Fully matched.','partial':'Partly matched ({earned} of {possible}).','zero':'Not matched (0 of {possible}).',
   'strength':'{name} is fully matched: {area}.','concern':'{name} scores {earned} of {possible}: {area}.',
-  'guidance':'Use this as one input among many. Talk openly about values, family expectations and life goals, and consult a trusted astrologer for Manglik and dosha-cancellation checks before any decision.'},
+  'guidance':'Use this as one input among many. Talk openly about values, family expectations and life goals, and consult a trusted astrologer for any chart questions and dosha-cancellation checks before a decision.'},
  'hi':{
   'overview':'पारंपरिक अष्टकूट (गुण मिलान) पद्धति में {P1} और {P2} के 36 में से {score} गुण मिलते हैं।',
   'excellent':'परंपरा के अनुसार यह बहुत श्रेष्ठ मिलान माना जाता है।','good':'परंपरा के अनुसार इस श्रेणी के गुण अच्छा मिलान माने जाते हैं।',
@@ -80,7 +80,7 @@ TEXT={'en':{
   'cultural':'यह सांस्कृतिक व्याख्या है, रिश्ते के बारे में भविष्यवाणी नहीं।',
   'compare':'{P1}: {a}; {P2}: {b}।','full':'पूर्ण मिलान।','partial':'आंशिक मिलान ({possible} में से {earned})।','zero':'मिलान नहीं ({possible} में से 0)।',
   'strength':'{name} पूर्ण रूप से मिलता है: {area}।','concern':'{name} में {possible} में से {earned} गुण: {area}।',
-  'guidance':'इसे निर्णय के कई आधारों में से एक मानें। मूल्यों, पारिवारिक अपेक्षाओं और जीवन-लक्ष्यों पर खुलकर बात करें, और किसी भी निर्णय से पहले मांगलिक व दोष-परिहार की जाँच किसी विश्वसनीय ज्योतिषी से कराएँ।'}}
+  'guidance':'इसे निर्णय के कई आधारों में से एक मानें। मूल्यों, पारिवारिक अपेक्षाओं और जीवन-लक्ष्यों पर खुलकर बात करें, और कुंडली से जुड़े प्रश्नों व दोष-परिहार की जाँच के लिए किसी विश्वसनीय ज्योतिषी से परामर्श लें।'}}
 
 def template(ctx,locale):
     """Deterministic summary built only from the context; also the fallback for any AI failure."""
@@ -104,7 +104,7 @@ Rules:
 - Write NO numbers at all, neither digits nor number words (no scores, points, totals or counts): the app shows every score next to your text. Never mention birth dates, times or places.
 - Use the koota names, attribute values and band exactly as given (same spelling and script).
 - Refer to the two people only as {P1} and {P2}, exactly with the braces. {P1} holds the groom-side rule position, {P2} the bride-side.
-- The listed doshas come from kootas with zero points; say traditional cancellation (parihar) rules exist but were not evaluated. Manglik was not evaluated.
+- The listed doshas come from kootas with zero points; say traditional cancellation (parihar) rules exist but were not evaluated. Do not discuss assessments that are not included in the supplied facts.
 - Be balanced and respectful; no fear, no guarantees, no predictions about health or children, no advice to marry or not marry. Mention once that this is a cultural tradition, not a prediction.
 - headline: one short line naming the traditional verdict. overview: 3-5 sentences. kootas: exactly one short sentence (at most 30 words) per koota key explaining what the two attributes mean together. strengths/considerations: 2-3 short points each (considerations may be empty if nothing is weak). guidance: 2 practical sentences.
 - Write in {language}.'''
@@ -120,7 +120,7 @@ def ai_enabled():
 def ai_payload(ctx):
     return {'total_gunas':ctx['score'],'maximum':36,'traditional_band':ctx['band_text'],'doshas':ctx['dosha_names'],
             'kootas':[{'key':k['key'],'name':k['name'],'governs':k['area'],'points':k['earned'],'maximum':k['possible'],'P1':k['p1'],'P2':k['p2']} for k in ctx['kootas']],
-            'not_evaluated':['manglik','dosha cancellation (parihar)'],
+            'not_evaluated':['dosha cancellation (parihar)'],
             'calculation_notes':ctx['warnings']}
 
 DIGITS=str.maketrans('०१२३४५६७८९','0123456789')
