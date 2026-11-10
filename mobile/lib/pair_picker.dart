@@ -120,22 +120,42 @@ class _PairPickerPageState extends State<PairPickerPage> {
         : first
         ? 'crest_groom'
         : 'crest_bride';
+    // Emerald and gold: saturated green paired with a warm champagne gold.
+    final titleColor = first
+        ? const Color(0xfffff9e9)
+        : const Color(0xff24462f);
+    final labelColor = first
+        ? const Color(0xffe9d297)
+        : const Color(0xff806028);
+    final detailColor = first
+        ? const Color(0xffe6e8d8)
+        : const Color(0xff665741);
     return Expanded(
       child: Container(
         padding: const EdgeInsets.fromLTRB(9, 12, 9, 14),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Palette.surface, Color(0xfff5ebd9)],
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: first
+                ? const [
+                    Color(0xff4a8c63),
+                    Color(0xff236244),
+                    Color(0xff103e2d),
+                  ]
+                : const [
+                    Color(0xfffff4d9),
+                    Color(0xffe9ce91),
+                    Color(0xffc99d4e),
+                  ],
           ),
           borderRadius: BorderRadius.circular(19),
-          border: Border.all(color: const Color(0xffd7c28d), width: 1.2),
+          border: Border.all(color: const Color(0xffc6a35e), width: 1.8),
           boxShadow: [
             BoxShadow(
-              color: Palette.shadow.withValues(alpha: .14),
-              blurRadius: 15,
-              offset: const Offset(0, 6),
+              color: Palette.shadow.withValues(alpha: .25),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
@@ -147,18 +167,18 @@ class _PairPickerPageState extends State<PairPickerPage> {
             Text(
               t(first ? 'firstPerson' : 'secondPerson').toUpperCase(),
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 10,
                 letterSpacing: 1,
                 fontWeight: FontWeight.bold,
-                color: Palette.gold,
+                color: labelColor,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               role,
               textAlign: TextAlign.center,
-              style: heading(16, color: Palette.greenDeep),
+              style: heading(16, color: titleColor),
             ),
             const SizedBox(height: 12),
             PopupMenuButton<String>(
@@ -248,9 +268,16 @@ class _PairPickerPageState extends State<PairPickerPage> {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 7),
                 decoration: BoxDecoration(
-                  color: Palette.surface,
+                  color: const Color(0xfffffaf0),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xffc8b98e)),
+                  border: Border.all(color: const Color(0xffe0bf74)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: .12),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
                 child: Row(
                   children: [
@@ -290,7 +317,7 @@ class _PairPickerPageState extends State<PairPickerPage> {
                   maxLines: 2,
                   textAlign: TextAlign.center,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 10, color: Palette.muted),
+                  style: TextStyle(fontSize: 10, color: detailColor),
                 ),
               ),
           ],
