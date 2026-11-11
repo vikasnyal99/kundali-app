@@ -23,6 +23,8 @@ class PairPickerPage extends StatefulWidget {
 }
 
 class _PairPickerPageState extends State<PairPickerPage> {
+  final firstMenuKey = GlobalKey<PopupMenuButtonState<String>>();
+  final secondMenuKey = GlobalKey<PopupMenuButtonState<String>>();
   List people = [];
   String? firstId, secondId, error;
   bool loading = true, busy = false;
@@ -131,196 +133,206 @@ class _PairPickerPageState extends State<PairPickerPage> {
         ? const Color(0xffe6e8d8)
         : const Color(0xff665741);
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(9, 12, 9, 14),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: first
-                ? const [
-                    Color(0xff4a8c63),
-                    Color(0xff236244),
-                    Color(0xff103e2d),
-                  ]
-                : const [
-                    Color(0xfffff4d9),
-                    Color(0xffe9ce91),
-                    Color(0xffc99d4e),
-                  ],
+      child: GestureDetector(
+        key: ValueKey(first ? 'person-card-first' : 'person-card-second'),
+        onTap: busy
+            ? null
+            : () => (first ? firstMenuKey : secondMenuKey).currentState
+                  ?.showButtonMenu(),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 224),
+          padding: const EdgeInsets.fromLTRB(9, 9, 9, 12),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: first
+                  ? const [
+                      Color(0xff4a8c63),
+                      Color(0xff236244),
+                      Color(0xff103e2d),
+                    ]
+                  : const [
+                      Color(0xfffff4d9),
+                      Color(0xffe9ce91),
+                      Color(0xffc99d4e),
+                    ],
+            ),
+            borderRadius: BorderRadius.circular(19),
+            border: Border.all(color: const Color(0xffc6a35e), width: 1.8),
+            boxShadow: [
+              BoxShadow(
+                color: Palette.shadow.withValues(alpha: .25),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
-          borderRadius: BorderRadius.circular(19),
-          border: Border.all(color: const Color(0xffc6a35e), width: 1.8),
-          boxShadow: [
-            BoxShadow(
-              color: Palette.shadow.withValues(alpha: .25),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Art(crest, width: 112, height: 112),
-            const SizedBox(height: 6),
-            Text(
-              t(first ? 'firstPerson' : 'secondPerson').toUpperCase(),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 10,
-                letterSpacing: 1,
-                fontWeight: FontWeight.bold,
-                color: labelColor,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Art(crest, width: 88, height: 88),
+              const SizedBox(height: 3),
+              Text(
+                t(first ? 'firstPerson' : 'secondPerson').toUpperCase(),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 10,
+                  letterSpacing: 1,
+                  fontWeight: FontWeight.bold,
+                  color: labelColor,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              role,
-              textAlign: TextAlign.center,
-              style: heading(16, color: titleColor),
-            ),
-            const SizedBox(height: 12),
-            PopupMenuButton<String>(
-              tooltip: t('personDropdownHint'),
-              enabled: !busy,
-              constraints: const BoxConstraints(
-                minWidth: 235,
-                maxWidth: 290,
-                maxHeight: 360,
+              const SizedBox(height: 4),
+              Text(
+                role,
+                textAlign: TextAlign.center,
+                style: heading(16, color: titleColor),
               ),
-              position: PopupMenuPosition.under,
-              onSelected: (value) {
-                if (value == '__add__') {
-                  addPerson(first);
-                  return;
-                }
-                setState(() {
-                  if (first) {
-                    firstId = value;
-                  } else {
-                    secondId = value;
+              const SizedBox(height: 10),
+              PopupMenuButton<String>(
+                key: first ? firstMenuKey : secondMenuKey,
+                tooltip: t('personDropdownHint'),
+                enabled: !busy,
+                constraints: const BoxConstraints(
+                  minWidth: 235,
+                  maxWidth: 290,
+                  maxHeight: 360,
+                ),
+                position: PopupMenuPosition.under,
+                onSelected: (value) {
+                  if (value == '__add__') {
+                    addPerson(first);
+                    return;
                   }
-                });
-              },
-              itemBuilder: (_) => [
-                for (final p in available)
+                  setState(() {
+                    if (first) {
+                      firstId = value;
+                    } else {
+                      secondId = value;
+                    }
+                  });
+                },
+                itemBuilder: (_) => [
+                  for (final p in available)
+                    PopupMenuItem<String>(
+                      value: p['id'].toString(),
+                      child: Row(
+                        children: [
+                          Avatar(
+                            p['display_name'].toString(),
+                            image: p['avatar'] as String?,
+                            size: 35,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  p['display_name'].toString(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  p['birth_place_name'].toString(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Palette.muted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  const PopupMenuDivider(),
                   PopupMenuItem<String>(
-                    value: p['id'].toString(),
+                    value: '__add__',
                     child: Row(
                       children: [
-                        Avatar(
-                          p['display_name'].toString(),
-                          image: p['avatar'] as String?,
-                          size: 35,
+                        const Icon(
+                          Icons.person_add_alt_1,
+                          color: Palette.greenDark,
                         ),
                         const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                p['display_name'].toString(),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                p['birth_place_name'].toString(),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: Palette.muted,
-                                ),
-                              ),
-                            ],
+                        Text(
+                          t('addNewPerson'),
+                          style: const TextStyle(
+                            color: Palette.greenDeep,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
                     ),
                   ),
-                const PopupMenuDivider(),
-                PopupMenuItem<String>(
-                  value: '__add__',
+                ],
+                child: Container(
+                  height: 42,
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 7),
+                  decoration: BoxDecoration(
+                    color: const Color(0xfffffaf0),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xffe0bf74)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: .12),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
                   child: Row(
                     children: [
-                      const Icon(
-                        Icons.person_add_alt_1,
-                        color: Palette.greenDark,
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        t('addNewPerson'),
-                        style: const TextStyle(
-                          color: Palette.greenDeep,
-                          fontWeight: FontWeight.bold,
+                      if (person != null)
+                        Avatar(
+                          person['display_name'].toString(),
+                          image: person['avatar'] as String?,
+                          size: 30,
                         ),
+                      if (person != null) const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          person?['display_name']?.toString() ??
+                              t('personDropdownHint'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: person == null ? 11 : 12,
+                            fontWeight: FontWeight.w600,
+                            color: person == null ? Palette.muted : Palette.ink,
+                          ),
+                        ),
+                      ),
+                      const Icon(
+                        Icons.keyboard_arrow_down,
+                        color: Palette.greenDark,
                       ),
                     ],
                   ),
                 ),
-              ],
-              child: Container(
-                height: 46,
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 7),
-                decoration: BoxDecoration(
-                  color: const Color(0xfffffaf0),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xffe0bf74)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: .12),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    if (person != null)
-                      Avatar(
-                        person['display_name'].toString(),
-                        image: person['avatar'] as String?,
-                        size: 30,
-                      ),
-                    if (person != null) const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        person?['display_name']?.toString() ??
-                            t('personDropdownHint'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: person == null ? 11 : 12,
-                          fontWeight: FontWeight.w600,
-                          color: person == null ? Palette.muted : Palette.ink,
-                        ),
-                      ),
-                    ),
-                    const Icon(
-                      Icons.keyboard_arrow_down,
-                      color: Palette.greenDark,
-                    ),
-                  ],
-                ),
               ),
-            ),
-            if (person != null)
               Padding(
                 padding: const EdgeInsets.only(top: 7),
                 child: Text(
-                  personLine(person, widget.t, widget.locale),
-                  maxLines: 2,
+                  person == null
+                      ? t('tapToChoosePerson')
+                      : personLine(person, widget.t, widget.locale),
+                  maxLines: 1,
                   textAlign: TextAlign.center,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 10, color: detailColor),
                 ),
               ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -427,23 +439,6 @@ class _PairPickerPageState extends State<PairPickerPage> {
                               choice(false),
                             ],
                           ),
-                        const SizedBox(height: 18),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Palette.greenSoft,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: const Color(0xffd5e2ce)),
-                          ),
-                          child: Text(
-                            t('chooseBothPeopleBody'),
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Palette.greenDark,
-                            ),
-                          ),
-                        ),
                         if (error != null)
                           Padding(
                             padding: const EdgeInsets.only(top: 12),

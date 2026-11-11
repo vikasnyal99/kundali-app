@@ -275,11 +275,11 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Choose both people'), findsOneWidget);
       expect(actionOf(tester, 'Match Kundlis'), isNull);
-      await tester.tap(find.byType(PopupMenuButton<String>).first);
+      await tester.tap(find.byKey(const ValueKey('person-card-first')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Asha').last);
       await tester.pumpAndSettle();
-      await tester.tap(find.byType(PopupMenuButton<String>).last);
+      await tester.tap(find.byKey(const ValueKey('person-card-second')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Bharat').last);
       await tester.pumpAndSettle();
@@ -336,7 +336,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Choose both people'), findsOneWidget);
     expect(tester.takeException(), isNull);
-    await tester.tap(find.byType(PopupMenuButton<String>).first);
+    final firstCard = find.byKey(const ValueKey('person-card-first'));
+    await tester.tapAt(tester.getTopLeft(firstCard) + const Offset(50, 45));
     await tester.pumpAndSettle();
     expect(find.text('Add New Person'), findsOneWidget);
     expect(tester.takeException(), isNull);
