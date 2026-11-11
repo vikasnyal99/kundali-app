@@ -140,8 +140,8 @@ class _PairPickerPageState extends State<PairPickerPage> {
             : () => (first ? firstMenuKey : secondMenuKey).currentState
                   ?.showButtonMenu(),
         child: Container(
-          constraints: const BoxConstraints(minHeight: 224),
-          padding: const EdgeInsets.fromLTRB(9, 9, 9, 12),
+          constraints: const BoxConstraints(minHeight: 274),
+          padding: const EdgeInsets.fromLTRB(9, 12, 9, 14),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
@@ -171,8 +171,8 @@ class _PairPickerPageState extends State<PairPickerPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Art(crest, width: 88, height: 88),
-              const SizedBox(height: 3),
+              Art(crest, width: 104, height: 104),
+              const SizedBox(height: 5),
               Text(
                 t(first ? 'firstPerson' : 'secondPerson').toUpperCase(),
                 textAlign: TextAlign.center,
@@ -189,7 +189,7 @@ class _PairPickerPageState extends State<PairPickerPage> {
                 textAlign: TextAlign.center,
                 style: heading(16, color: titleColor),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               PopupMenuButton<String>(
                 key: first ? firstMenuKey : secondMenuKey,
                 tooltip: t('personDropdownHint'),
@@ -274,7 +274,7 @@ class _PairPickerPageState extends State<PairPickerPage> {
                   ),
                 ],
                 child: Container(
-                  height: 42,
+                  height: 45,
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(horizontal: 7),
                   decoration: BoxDecoration(
@@ -319,16 +319,48 @@ class _PairPickerPageState extends State<PairPickerPage> {
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.only(top: 7),
-                child: Text(
-                  person == null
-                      ? t('tapToChoosePerson')
-                      : personLine(person, widget.t, widget.locale),
-                  maxLines: 1,
-                  textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 10, color: detailColor),
+              SizedBox(
+                height: 44,
+                child: Center(
+                  child: person == null
+                      ? Text(
+                          t('tapToChoosePerson'),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 12, color: detailColor),
+                        )
+                      : Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              displayDate(
+                                person['birth_date'].toString(),
+                                widget.locale,
+                              ),
+                              maxLines: 2,
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: detailColor,
+                              ),
+                            ),
+                            Text(
+                              person['birth_place_name']
+                                  .toString()
+                                  .split(',')
+                                  .first
+                                  .trim(),
+                              maxLines: 1,
+                              textAlign: TextAlign.center,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: detailColor,
+                              ),
+                            ),
+                          ],
+                        ),
                 ),
               ),
             ],

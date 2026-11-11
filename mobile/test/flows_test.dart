@@ -341,6 +341,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Add New Person'), findsOneWidget);
     expect(tester.takeException(), isNull);
+    await tester.tap(find.text('Asha').last);
+    await tester.pumpAndSettle();
+    expect(find.text('14 Sep 1997'), findsOneWidget);
+    expect(find.text('Delhi'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
   testWidgets('API errors are localised and offer retry', (tester) async {
     await launch(
