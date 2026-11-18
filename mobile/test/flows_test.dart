@@ -90,7 +90,7 @@ class FakeBackend {
         );
       case 'GET /v1/matches/m-b/summary':
         return json({
-          'source': 'ai',
+          'source': 'template',
           'headline': 'Good match (Uttam)',
           'overview': 'Asha and Bharat share 24 of 36 gunas.',
           'kootas': [

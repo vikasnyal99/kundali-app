@@ -1,7 +1,5 @@
-"""Inline calculation, summaries (template and mocked OpenAI) and the full report with real chart details."""
-import json
+"""Inline calculation, template summaries and the full report with real chart details."""
 from types import SimpleNamespace
-import httpx
 import pytest
 from sqlalchemy import select
 from app import summary, services
@@ -63,35 +61,14 @@ def test_summary_endpoint_returns_template_and_caches(database,client,local):
     assert client.get(f"/v1/matches/{m['id']}/summary?locale=hi",headers=h).json()==s
     assert client.get(f"/v1/matches/{m['id']}/summary?locale=xx",headers=h).status_code==422
 
-def fake_openai(monkeypatch,answer,calls):
-    class Client:
-        def __init__(self,**kw): pass
-        def __enter__(self): return self
-        def __exit__(self,*a): return False
-        def post(self,url,json,headers):
-            calls.append(json)
-            return httpx.Response(200,json={'choices':[{'message':{'content':__import__('json').dumps(answer)}}]},request=httpx.Request('POST',url))
-    monkeypatch.setattr(summary.httpx,'Client',Client)
-    monkeypatch.setattr(settings,'openai_api_key','test-key')
-
-def answer(**over):
-    base={'headline':'Good match','overview':'{P1} and {P2} are a good match.','kootas':[{'key':k,'note':f'{k} note for {{P1}}'} for k,_,_ in ROWS],
-          'strengths':['Gana fully matches'],'considerations':['Nadi Dosha is present'],'guidance':'Talk openly.'}
-    return {**base,**over}
-
-def test_ai_summary_fills_names_and_sends_no_birth_data(monkeypatch):
-    calls=[]; fake_openai(monkeypatch,answer(),calls)
-    s,cacheable=summary.build(match(),'en')
-    assert cacheable and s['source']=='ai' and s['overview'].startswith('Deepak and Kirti')
-    assert s['kootas'][0]['note']=='varna note for Deepak' and s['kootas'][7]['earned']==0
-    sent=json.dumps(calls[0],ensure_ascii=False)
-    assert 'Deepak' not in sent and '1995' not in sent and 'Delhi' not in sent and '28.6' not in sent
-
-@pytest.mark.parametrize('bad',[answer(overview='{P1} and {P2} share 31 of 36 gunas.'),answer(guidance='कुल २५ गुण।'),answer(kootas=[{'key':'varna','note':'x'}]),answer(guidance='Ask {name}.')])
-def test_ai_answer_with_invented_numbers_or_gaps_falls_back_uncached(monkeypatch,bad):
-    fake_openai(monkeypatch,bad,[])
-    s,cacheable=summary.build(match(),'en')
-    assert s['source']=='template' and not cacheable and '25.5 of 36' in s['overview']
+def test_previous_summary_is_regenerated_from_facts():
+    m=match()
+    m.summaries={'en':{'version':'v3','source':'ai','overview':'Old generated text'}}
+    assert not summary.fresh(m.summaries['en'])
+    current,cacheable=summary.build(m,'en')
+    assert cacheable and current['source']=='template'
+    assert current['version']==summary.VERSION
+    assert '25.5 of 36' in current['overview']
 
 def test_full_report_has_charts_and_avakhada_with_real_engine():
     pytest.importorskip('vedic_calc'); pytest.importorskip('weasyprint')

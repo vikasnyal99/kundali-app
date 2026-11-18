@@ -1,19 +1,10 @@
-"""Match summaries: OpenAI-written explanation around the engine's facts, with a deterministic fallback.
-
-The model never produces or changes a score. It receives only the koota table, Moon-chart attributes and
-dosha flags (no names, birth dates or places); it writes {P1}/{P2} and names are filled in here. An answer
-that mentions a number absent from the facts is rejected and the template is used instead.
-"""
-import json
+"""Deterministic match summaries built from calculated facts."""
 import logging
-import re
 import threading
-import httpx
-from .config import settings
 from . import jyotish
 
 log=logging.getLogger('summary')
-VERSION='v3'  # bump when the prompt changes so cached summaries regenerate
+VERSION='v4'  # regenerate previously cached summaries using the fixed templates
 KOOTA_ORDER=['varna','vashya','tara','yoni','graha_maitri','gana','bhakoot','nadi']
 KOOTA_NAMES={'en':{'varna':'Varna','vashya':'Vashya','tara':'Tara','yoni':'Yoni','graha_maitri':'Graha Maitri','gana':'Gana','bhakoot':'Bhakoot','nadi':'Nadi'},
  'hi':{'varna':'वर्ण','vashya':'वश्य','tara':'तारा','yoni':'योनि','graha_maitri':'ग्रह मैत्री','gana':'गण','bhakoot':'भकूट','nadi':'नाड़ी'}}
@@ -83,7 +74,7 @@ TEXT={'en':{
   'guidance':'इसे निर्णय के कई आधारों में से एक मानें। मूल्यों, पारिवारिक अपेक्षाओं और जीवन-लक्ष्यों पर खुलकर बात करें, और कुंडली से जुड़े प्रश्नों व दोष-परिहार की जाँच के लिए किसी विश्वसनीय ज्योतिषी से परामर्श लें।'}}
 
 def template(ctx,locale):
-    """Deterministic summary built only from the context; also the fallback for any AI failure."""
+    """Deterministic summary built only from the context."""
     T=TEXT[locale]; P1,P2=ctx['names']
     overview=[T['overview'].format(P1=P1,P2=P2,score=num(ctx['score'])),T[ctx['band']]]
     if ctx['doshas']: overview.append(T['dosha'].format(doshas=', '.join(ctx['dosha_names'])))
@@ -98,81 +89,21 @@ def template(ctx,locale):
             'considerations':[T['concern'].format(name=k['name'],earned=num(k['earned']),possible=num(k['possible']),area=k['area'].lower() if locale=='en' else k['area']) for k in ctx['kootas'] if k['earned']<k['possible']/2],
             'guidance':T['guidance']}
 
-SYSTEM='''You explain a traditional Vedic Ashta Koota (Guna Milan) marriage-matching result to an Indian family, the way an experienced, kind pandit would, in plain language.
-Rules:
-- Use ONLY the facts provided. Never calculate, change, round or invent scores, kootas, doshas, planets or chart features.
-- Write NO numbers at all, neither digits nor number words (no scores, points, totals or counts): the app shows every score next to your text. Never mention birth dates, times or places.
-- Use the koota names, attribute values and band exactly as given (same spelling and script).
-- Refer to the two people only as {P1} and {P2}, exactly with the braces. {P1} holds the groom-side rule position, {P2} the bride-side.
-- The listed doshas come from kootas with zero points; say traditional cancellation (parihar) rules exist but were not evaluated. Do not discuss assessments that are not included in the supplied facts.
-- Be balanced and respectful; no fear, no guarantees, no predictions about health or children, no advice to marry or not marry. Mention once that this is a cultural tradition, not a prediction.
-- headline: one short line naming the traditional verdict. overview: 3-5 sentences. kootas: exactly one short sentence (at most 30 words) per koota key explaining what the two attributes mean together. strengths/considerations: 2-3 short points each (considerations may be empty if nothing is weak). guidance: 2 practical sentences.
-- Write in {language}.'''
-
-SCHEMA={'type':'object','additionalProperties':False,'required':['headline','overview','kootas','strengths','considerations','guidance'],'properties':{
-  'headline':{'type':'string'},'overview':{'type':'string'},
-  'kootas':{'type':'array','items':{'type':'object','additionalProperties':False,'required':['key','note'],'properties':{'key':{'type':'string','enum':KOOTA_ORDER},'note':{'type':'string'}}}},
-  'strengths':{'type':'array','items':{'type':'string'}},'considerations':{'type':'array','items':{'type':'string'}},'guidance':{'type':'string'}}}
-
-def ai_enabled():
-    return bool(settings.openai_api_key and settings.openai_model)
-
-def ai_payload(ctx):
-    return {'total_gunas':ctx['score'],'maximum':36,'traditional_band':ctx['band_text'],'doshas':ctx['dosha_names'],
-            'kootas':[{'key':k['key'],'name':k['name'],'governs':k['area'],'points':k['earned'],'maximum':k['possible'],'P1':k['p1'],'P2':k['p2']} for k in ctx['kootas']],
-            'not_evaluated':['dosha cancellation (parihar)'],
-            'calculation_notes':ctx['warnings']}
-
-DIGITS=str.maketrans('०१२३४५६७८९','0123456789')
-
-def check(answer,ctx):
-    """Reject an AI answer that is incomplete or states any number (scores are shown from the facts)."""
-    keys=[k['key'] for k in answer['kootas']]
-    if sorted(keys)!=sorted(k['key'] for k in ctx['kootas']): raise ValueError('koota_notes')
-    text=' '.join([answer['headline'],answer['overview'],answer['guidance'],*answer['strengths'],*answer['considerations'],*(k['note'] for k in answer['kootas'])])
-    if not answer['overview'].strip() or len(text)>12000: raise ValueError('length')
-    if re.search(r'\d',re.sub(r'\{P[12]\}','',text).translate(DIGITS)): raise ValueError('unexpected_number')
-    if re.search(r'\{(?!P[12]\})[^}]*\}',text): raise ValueError('placeholder')
-
-def ask_openai(ctx,locale):
-    system=SYSTEM.replace('{language}','Hindi (Devanagari script, simple everyday Hindi; the method is called अष्टकूट गुण मिलान)' if locale=='hi' else 'English')
-    body={'model':settings.openai_model,'max_completion_tokens':2500,
-          'messages':[{'role':'system','content':system},{'role':'user','content':json.dumps(ai_payload(ctx),ensure_ascii=False)}],
-          'response_format':{'type':'json_schema','json_schema':{'name':'match_summary','strict':True,'schema':SCHEMA}}}
-    with httpx.Client(timeout=settings.openai_timeout_seconds) as client:
-        response=client.post(f'{settings.openai_base_url}/chat/completions',json=body,headers={'Authorization':f'Bearer {settings.openai_api_key}'})
-        response.raise_for_status()
-    answer=json.loads(response.json()['choices'][0]['message']['content'])
-    check(answer,ctx)
-    P1,P2=ctx['names']
-    fill=lambda s:s.replace('{P1}',P1).replace('{P2}',P2)
-    return {'headline':fill(answer['headline']),'overview':fill(answer['overview']),'notes':{k['key']:fill(k['note']) for k in answer['kootas']},
-            'strengths':[fill(s) for s in answer['strengths']],'considerations':[fill(s) for s in answer['considerations']],'guidance':fill(answer['guidance'])}
-
 def build(match,locale):
-    """Returns (summary, cacheable). An AI failure falls back to the template without caching it."""
+    """Returns a summary generated from the calculated facts."""
     ctx=context(match,locale)
-    source='template'; text=None; cacheable=True
-    if ai_enabled():
-        try:
-            text=ask_openai(ctx,locale); source='ai'
-        except httpx.HTTPStatusError as exc:
-            log.warning('summary for match %s: openai http %s',match.id,exc.response.status_code); cacheable=False
-        except Exception as exc:
-            # Never log prompts or answers: they contain the people's chart attributes.
-            log.warning('summary for match %s: %s',match.id,type(exc).__name__ if not isinstance(exc,ValueError) else exc); cacheable=False
-    if text is None: text=template(ctx,locale)
-    summary={'version':VERSION,'source':source,'locale':locale,'names':ctx['names'],'score':ctx['score'],'possible':36,'band':ctx['band'],'band_text':ctx['band_text'],
+    text=template(ctx,locale)
+    summary={'version':VERSION,'source':'template','locale':locale,'names':ctx['names'],'score':ctx['score'],'possible':36,'band':ctx['band'],'band_text':ctx['band_text'],
              'headline':text['headline'],'overview':text['overview'],'strengths':text['strengths'],'considerations':text['considerations'],'guidance':text['guidance'],
              'doshas':[{'key':k,'name':n} for k,n in zip(ctx['doshas'],ctx['dosha_names'])],
              'kootas':[{**{f:k[f] for f in ('key','name','area','earned','possible','p1','p2')},'note':text['notes'].get(k['key'],'')} for k in ctx['kootas']]}
-    return summary,cacheable
+    return summary,True
 
-# One lock per (match, locale) bucket so a pre-warm and a page view do not both call the API.
+# One lock per (match, locale) bucket so a pre-warm and a page view do not both regenerate the summary.
 LOCKS=[threading.Lock() for _ in range(64)]
 
 def fresh(cached):
-    return bool(cached) and cached.get('version')==VERSION and (cached.get('source')=='ai' or not ai_enabled())
+    return bool(cached) and cached.get('version')==VERSION and cached.get('source')=='template'
 
 def ensure(db,match,locale):
     """Cached summary for a ready match, generating and storing it on first use."""

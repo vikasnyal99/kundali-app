@@ -26,7 +26,7 @@ LABELS={'en':{'title':'Kundli matching report','subtitle':'Ashta Koota Guna Mila
   'charts':'Lagna Kundli (D1, North Indian style)','planets':'Planetary positions','planet':'Graha','sign':'Rashi','degree':'Degree','nak':'Nakshatra','retro':'* retrograde',
   'reading':'Interpretation','overview':'Overview','koota_notes':'Koota-wise reading','strengths':'Strengths','considerations':'Points to consider','guidance':'Guidance',
   'dosha_note':'Dosha analysis','method':'Method and notes','engine':'Engine','version':'Version','ruleset':'Ruleset','ayanamsa':'Ayanamsa','calculated_at':'Calculated at (UTC)',
-  'validation':'Validation status','warnings':'Calculation notes','ai':'Explanations written with AI from the calculated facts; scores are not AI-generated.',
+  'validation':'Validation status','warnings':'Calculation notes',
   'disclaimer':'Traditional astrology is a cultural framework, not scientific evidence of relationship success. Consider consent, communication and shared values.',
   'exact':'exact','approximate':'approximate','unknown':'unknown','footer':'KundliMilan · Guna Milan report',
   'no_chart':'Birth time unknown: the Lagna chart needs the exact time and is not drawn.','noon':'Positions at 12:00 noon (birth time unknown).'},
@@ -41,7 +41,7 @@ LABELS={'en':{'title':'Kundli matching report','subtitle':'Ashta Koota Guna Mila
   'charts':'लग्न कुंडली (D1, उत्तर भारतीय शैली)','planets':'ग्रह स्थिति','planet':'ग्रह','sign':'राशि','degree':'अंश','nak':'नक्षत्र','retro':'* वक्री',
   'reading':'फलादेश','overview':'सारांश','koota_notes':'कूट-वार विवेचन','strengths':'अनुकूल पक्ष','considerations':'विचारणीय पक्ष','guidance':'मार्गदर्शन',
   'dosha_note':'दोष विचार','method':'गणना पद्धति एवं टिप्पणियाँ','engine':'इंजन','version':'संस्करण','ruleset':'नियम-सेट','ayanamsa':'अयनांश','calculated_at':'गणना समय (UTC)',
-  'validation':'सत्यापन स्थिति','warnings':'गणना संबंधी टिप्पणियाँ','ai':'विवेचन गणना किए गए तथ्यों से AI द्वारा लिखा गया है; गुण AI द्वारा नहीं निकाले गए।',
+  'validation':'सत्यापन स्थिति','warnings':'गणना संबंधी टिप्पणियाँ',
   'disclaimer':'पारंपरिक ज्योतिष एक सांस्कृतिक दृष्टिकोण है, रिश्ते की सफलता का वैज्ञानिक प्रमाण नहीं। आपसी सहमति, संवाद और साझा मूल्यों पर भी विचार करें।',
   'exact':'सटीक','approximate':'अनुमानित','unknown':'अज्ञात','footer':'KundliMilan · गुण मिलान रिपोर्ट',
   'no_chart':'जन्म समय अज्ञात: लग्न कुंडली के लिए सटीक समय आवश्यक है, इसलिए यह नहीं बनाई गई।','noon':'ग्रह स्थिति दोपहर 12:00 बजे की (जन्म समय अज्ञात)।'}}
@@ -208,6 +208,6 @@ def report_html(match,locale,summary=None):
 {f"<h3>{e(L['strengths'])}</h3>{li(text['strengths'])}" if text['strengths'] else ''}
 {f"<h3>{e(L['considerations'])}</h3>{li(text['considerations'])}" if text['considerations'] else ''}
 <div class="box"><div class="hl">{e(L['guidance'])}</div>{e(text['guidance'])}</div>
-<div class="disc"><b>{e(L['method'])}.</b> {method}{f"<br><b>{e(L['warnings'])}:</b> {warnings}" if warnings else ''}<br>{e(L['ai']) + ' ' if text.get('source')=='ai' else ''}{e(L['disclaimer'])}</div></section>'''
+<div class="disc"><b>{e(L['method'])}.</b> {method}{f"<br><b>{e(L['warnings'])}:</b> {warnings}" if warnings else ''}<br>{e(L['disclaimer'])}</div></section>'''
     return (f'<html lang="{locale}"><head><meta charset="utf-8"><title>{e(L["title"])}</title><style>{css}</style></head>'
             f'<body><div class="frame"></div>{cover}{tables}{charts}{reading}</body></html>')

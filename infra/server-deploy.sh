@@ -40,15 +40,6 @@ ASTROLOGY_RELEASE_APPROVED=true
 EOF
   echo "created .env (FORWARDED_ALLOW_IPS=${subnet})"
 fi
-# Optional OpenAI key for match summaries: asked once without echo, stored only in .env (never in git).
-if ! grep -q '^OPENAI_API_KEY=.' .env && [ -t 0 ]; then
-  read -rsp "OpenAI API key for match summaries (Enter to skip): " key; echo
-  if [ -n "$key" ]; then
-    sed -i '/^OPENAI_API_KEY=/d' .env; printf 'OPENAI_API_KEY=%s\n' "$key" >> .env; echo "OpenAI key saved to .env"
-  fi
-  unset key
-fi
-
 $COMPOSE build
 $COMPOSE up -d --wait kundli-db
 $COMPOSE run --rm --no-deps -e DATABASE_URL="postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@kundli-db:5432/${POSTGRES_DB}" kundli-api alembic upgrade head

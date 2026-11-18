@@ -5,7 +5,7 @@ from datetime import timedelta
 from collections import defaultdict, deque
 from time import monotonic
 import jwt
-from fastapi import FastAPI, Depends, HTTPException, Request, Query, BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, Request, Query
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -15,12 +15,12 @@ from sqlalchemy import select, delete, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DBSession
 from .config import settings
-from .db import User, Person, Match, Comparison, Report, Job, Session, session, now
+from .db import User, Person, Match, Comparison, Report, Job, session, now
 from .schemas import PersonInput, MatchInput, ComparisonInput, LocaleInput
 from .places import search as search_places
 from . import summary as summaries
 
-app = FastAPI(title='KundliMilan AI', version='0.1.0')
+app = FastAPI(title='KundliMilan', version='0.1.0')
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins.split(','), allow_methods=['GET','POST','PATCH','DELETE'], allow_headers=['Authorization','Content-Type'])
 auth = HTTPBearer(auto_error=False)
 limits = defaultdict(deque)
@@ -59,11 +59,6 @@ def owned(db, cls, id, owner):
     return obj
 def person_json(p): return {'id':p.id,'revision':p.revision,**p.data}
 def match_json(m): return {'id':m.id,'status':m.status,'failure_code':m.failure_code,'people':m.snapshot['people'],'calculation':m.snapshot['settings'],'facts':m.facts}
-def warm_summary(match_id,locale):
-    """Background pre-generation so the summary page usually opens from cache."""
-    with Session() as db:
-        m=db.get(Match,match_id)
-        if m and m.status=='ready': summaries.ensure(db,m,locale)
 def enqueue(db,kind,id,payload=None): db.add(Job(kind=kind,target_id=id,payload=payload or {}))
 def compute(db,m):
     """The local engine takes about a millisecond, so compute in the request instead of waiting for the
@@ -134,13 +129,11 @@ def edit_person(id:str,body:PersonInput,u=Depends(user),db:DBSession=Depends(ses
 def remove_person(id:str,u=Depends(user),db:DBSession=Depends(session)):
     p=owned(db,Person,id,u.id); invalidate(db,u.id,id); db.delete(p); db.commit()
 @app.post('/v1/matches',status_code=202)
-def add_match(body:MatchInput,background:BackgroundTasks,u=Depends(user),db:DBSession=Depends(session)):
+def add_match(body:MatchInput,u=Depends(user),db:DBSession=Depends(session)):
     try:
         m=create_match(db,u.id,body.person1_id,body.person2_id); db.commit()
     except IntegrityError:
         db.rollback(); m=create_match(db,u.id,body.person1_id,body.person2_id); db.commit()
-    if m.status=='ready' and summaries.ai_enabled() and not summaries.fresh((m.summaries or {}).get(body.locale)):
-        background.add_task(warm_summary,m.id,body.locale)
     return match_json(m)
 @app.get('/v1/matches')
 def matches(u=Depends(user),db:DBSession=Depends(session)):

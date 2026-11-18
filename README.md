@@ -1,4 +1,4 @@
-# KundliMilan AI
+# KundliMilan
 
 Bilingual (English/Hindi) Vedic Kundli matching app: saved birth profiles, pair matching, fixed-Person-1
 multi-candidate comparison, and private PDF reports. Flutter (Android first, iOS-ready) + FastAPI +

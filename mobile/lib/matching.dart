@@ -598,7 +598,7 @@ class _MatchDetailState extends State<MatchDetail> {
     }
   }
 
-  /// Summary text (AI or template) plus any existing report for this match and language.
+  /// Summary text plus any existing report for this match and language.
   Future<void> load() async {
     setState(() {
       loadingSummary = true;
@@ -1121,14 +1121,6 @@ class _MatchDetailState extends State<MatchDetail> {
         t('disclaimer'),
         style: const TextStyle(fontSize: 12, color: Palette.muted),
       ),
-      if (summary?['source'] == 'ai')
-        Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Text(
-            t('aiNote'),
-            style: const TextStyle(fontSize: 12, color: Palette.muted),
-          ),
-        ),
     ],
   );
 
